@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Broken Gems</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0a0a0a;
+    --surface: #101010;
+    --line:    #262626;
+    --text:    #f2f2f2;
+    --muted:   #8a8a8a;
+    --white:   #ffffff;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  ::selection { background: var(--white); color: var(--bg); }
+
+  :focus-visible {
+    outline: 2px solid var(--white);
+    outline-offset: 3px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ── entrance ───────────────────────────────────────────────── */
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes unmask {
+    from { transform: translateY(105%); }
+    to   { transform: translateY(0); }
+  }
+
+  @keyframes widen {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
+  .rise {
+    opacity: 0;
+    animation: rise 0.7s var(--ease) forwards;
+  }
+
+  /* ── nav ────────────────────────────────────────────────────── */
+
+  nav {
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    text-decoration: none;
+    color: var(--text);
+  }
+
+  .brand svg { overflow: visible; }
+  .brand svg path { transition: transform 0.45s var(--ease); }
+  .brand:hover .gem-l { transform: translateX(-2px); }
+  .brand:hover .gem-r { transform: translateX(2px); }
+
+  .brand span {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .nav-links { display: flex; gap: 30px; }
+
+  .nav-links a {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 0;
+    position: relative;
+    transition: color 0.25s var(--ease);
+  }
+
+  .nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 100%; height: 1px;
+    background: var(--white);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s var(--ease);
+  }
+
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a:hover::after { transform: scaleX(1); }
+
+  /* ── hero ───────────────────────────────────────────────────── */
+
+  header { padding: 120px 0 96px; }
+
+  .mask { overflow: hidden; }
+
+  .mask h1 {
+    font-size: clamp(46px, 9vw, 88px);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    animation: unmask 0.85s var(--ease) forwards;
+    transform: translateY(105%);
+  }
+
+  .mask:nth-of-type(2) h1 { animation-delay: 0.09s; }
+
+  .rule {
+    height: 1px;
+    background: var(--line);
+    margin: 40px 0 26px;
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: widen 0.9s var(--ease) 0.4s forwards;
+  }
+
+  .lede {
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.65;
+    max-width: 420px;
+    animation-delay: 0.5s;
+  }
+
+  /* ── games ──────────────────────────────────────────────────── */
+
+  section { padding-bottom: 110px; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+    margin-bottom: 34px;
+  }
+
+  .sec-head h2, .sec-head span {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .sec-head span { color: var(--muted); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transition:
+      border-color 0.3s var(--ease),
+      transform 0.4s var(--ease),
+      background 0.3s var(--ease);
+  }
+
+  .card:hover {
+    border-color: var(--white);
+    background: #131313;
+    transform: translateY(-5px);
+  }
+
+  .art {
+    aspect-ratio: 4 / 3;
+    display: grid;
+    place-items: center;
+    border-bottom: 1px solid var(--line);
+    transition: border-color 0.3s var(--ease);
+  }
+
+  .card:hover .art { border-color: var(--white); }
+
+  .art svg { width: 96px; height: 96px; overflow: visible; }
+
+  .art path, .art line {
+    stroke: #4d4d4d;
+    stroke-width: 1.5;
+    fill: none;
+    stroke-linejoin: round;
+    transition: stroke 0.35s var(--ease), transform 0.5s var(--ease);
+  }
+
+  .card:hover .art path,
+  .card:hover .art line { stroke: var(--white); }
+
+  .card:hover .gem-l { transform: translateX(-7px) rotate(-3deg); }
+  .card:hover .gem-r { transform: translateX(7px) rotate(3deg); }
+
+  .card-body {
+    padding: 20px 22px 22px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .card h3 {
+    font-size: 18px;
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    margin-bottom: 5px;
+  }
+
+  .card p {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .arrow {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--muted);
+    transition: transform 0.4s var(--ease), color 0.3s var(--ease);
+  }
+
+  .card:hover .arrow {
+    transform: translateX(6px);
+    color: var(--white);
+  }
+
+  /* ── reveal on scroll ───────────────────────────────────────── */
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+  }
+
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* card swells and fades on the way into the game */
+  .card.burst {
+    transform: scale(1.9);
+    opacity: 0;
+    border-color: var(--white);
+    transition: transform 0.52s var(--ease), opacity 0.52s var(--ease);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  body.leaving { opacity: 0; transition: opacity 0.45s var(--ease); }
+
+  /* ── footer ─────────────────────────────────────────────────── */
+
+  footer {
+    margin-top: auto;
+    border-top: 1px solid var(--line);
+    padding: 26px 0;
+  }
+
+  .foot-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .foot-inner a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.25s var(--ease);
+  }
+
+  .foot-inner a:hover { color: var(--white); }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 0 20px; }
+    header { padding: 76px 0 64px; }
+    .nav-links { gap: 20px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: 0.01ms !important;
+    }
+    .mask h1 { transform: none; }
+    .rule { transform: scaleX(1); }
+    .rise, .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round">
+          <path class="gem-l" d="M12 2.5 L3 9.5 L12 21.5 Z M3 9.5 H12 M12 2.5 L8 9.5"/>
+          <path class="gem-r" d="M12 2.5 L21 9.5 L12 21.5 Z M12 9.5 H21 M12 2.5 L16 9.5"/>
+        </g>
+      </svg>
+      <span>Broken Gems</span>
+    </a>
+    <div class="nav-links">
+      <a href="#games">Games</a>
+      <a href="#about">About</a>
+    </div>
+  </div>
+</nav>
+
+<header class="wrap">
+  <div class="mask"><h1>Broken Gems.</h1></div>
+  <div class="mask"><h1>Play in a tab.</h1></div>
+  <div class="rule"></div>
+  <p class="lede rise">Small browser games with nothing in the way. No downloads, no accounts, no launcher &mdash; open the page and play.</p>
+</header>
+
+<section class="wrap" id="games">
+  <div class="sec-head reveal">
+    <h2>Games</h2>
+    <span>01</span>
+  </div>
+
+  <div class="grid">
+    <a class="card reveal" href="./game/">
+      <div class="art">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <g class="gem-l">
+            <path d="M60 18 L18 52 L60 104 Z"/>
+            <line x1="18" y1="52" x2="60" y2="52"/>
+            <line x1="60" y1="18" x2="38" y2="52"/>
+          </g>
+          <g class="gem-r">
+            <path d="M60 18 L102 52 L60 104 Z"/>
+            <line x1="60" y1="52" x2="102" y2="52"/>
+            <line x1="60" y1="18" x2="82" y2="52"/>
+          </g>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div>
+          <h3>Train An AI To Compete</h3>
+          <p>Node coding &middot; mazes</p>
+        </div>
+        <div class="arrow">&rarr;</div>
+      </div>
+    </a>
+  </div>
+</section>
+
+<footer id="about">
+  <div class="wrap foot-inner">
+    <span>Broken Gems &mdash; <span id="yr"></span></span>
+    <a href="#games">Back to top</a>
+  </div>
+</footer>
+
+<script>
+  document.getElementById("yr").textContent = new Date().getFullYear();
+
+  // Stagger the entrance of anything marked .rise that has no explicit delay.
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add("in");
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll(".reveal").forEach(function (el, i) {
+    el.style.transitionDelay = (i * 70) + "ms";
+    io.observe(el);
+  });
+
+  // Grow-and-fade the card, then hand off to the game.
+  document.querySelectorAll(".card[href]").forEach(function (card) {
+    card.addEventListener("click", function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      var href = card.getAttribute("href");
+      card.classList.add("burst");
+      document.body.classList.add("leaving");
+      setTimeout(function () { window.location.href = href; }, 430);
+    });
+  });
+</script>
+
+</body>
+</html>

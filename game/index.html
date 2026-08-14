@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train An AI To Compete — Broken Gems</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<!-- ── main menu ─────────────────────────────────────────────────────────── -->
+<section class="screen center" id="scr-menu">
+  <div class="menu-wrap">
+    <a class="home-link" href="../">&larr; Broken Gems</a>
+    <div class="mask"><h1 class="game-title">Train An AI</h1></div>
+    <div class="mask"><h1 class="game-title">To Compete</h1></div>
+    <p class="menu-sub">Wire up a program. Send it into the maze. Watch it fail, then fix it.</p>
+    <button class="big-btn" id="play-btn">Play</button>
+  </div>
+</section>
+
+<!-- ── save slots ────────────────────────────────────────────────────────── -->
+<section class="screen center" id="scr-slots">
+  <div class="menu-wrap wide">
+    <button class="back-link" data-back="scr-menu">&larr; Back</button>
+    <h2 class="scr-title">Save Slots</h2>
+    <div id="slot-list" class="slot-list"></div>
+    <button class="big-btn ghost" id="new-save-btn">+ New Save</button>
+  </div>
+</section>
+
+<!-- ── new save ──────────────────────────────────────────────────────────── -->
+<section class="screen center" id="scr-new">
+  <div class="menu-wrap wide">
+    <button class="back-link" data-back="scr-slots">&larr; Back</button>
+    <h2 class="scr-title">New Save</h2>
+
+    <label class="field">
+      <span class="field-label">Name</span>
+      <input id="save-name" class="text-input" maxlength="28" value="Save 1">
+    </label>
+
+    <div class="field">
+      <span class="field-label">Gamemode</span>
+      <div class="pick-row">
+        <button class="pick" data-mode="campaign">
+          <span class="pick-name">Campaign</span>
+          <span class="pick-desc">Ten hand-tuned levels. One turn to start, a monster-filled maze to finish.</span>
+        </button>
+        <button class="pick" data-mode="infinite">
+          <span class="pick-name">Infinite</span>
+          <span class="pick-desc">Pick one kind of level and play it forever, growing harder every time.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field collapse" id="inf-types">
+      <span class="field-label">Section type</span>
+      <div class="pick-row">
+        <button class="pick sm" data-inf="corridors">
+          <span class="pick-name">Corridors</span>
+          <span class="pick-desc">Twisting hallways. No monsters, ever.</span>
+        </button>
+        <button class="pick sm" data-inf="mazes">
+          <span class="pick-name">Mazes</span>
+          <span class="pick-desc">Mazes that keep growing. Still no monsters.</span>
+        </button>
+        <button class="pick sm" data-inf="hunted">
+          <span class="pick-name">Hunted</span>
+          <span class="pick-desc">Monsters from level one. They only multiply.</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="big-btn" id="create-btn" disabled>Create &amp; Play</button>
+  </div>
+</section>
+
+<!-- ── play ──────────────────────────────────────────────────────────────── -->
+<section class="screen" id="scr-play">
+  <header class="hud">
+    <div class="hud-left">
+      <button class="hud-btn quiet" id="btn-quit">&larr; Menu</button>
+      <div class="lvl-info">
+        <span id="lvl-num" class="lvl-num">Level 1</span>
+        <span id="lvl-name" class="lvl-name">One Turn</span>
+        <span id="lvl-ghosts" class="lvl-meta">no monsters</span>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <span class="save-tag" id="save-label"></span>
+      <button class="hud-btn" id="btn-reroll" title="Reroll this level's layout at the same difficulty">New Layout</button>
+      <span class="hud-sep"></span>
+      <label class="speed-wrap">
+        <span class="speed-label">Speed</span>
+        <select id="speed" class="speed"></select>
+      </label>
+      <span class="hud-sep"></span>
+      <button class="hud-btn run" id="btn-run">Run</button>
+      <button class="hud-btn" id="btn-pause" disabled>Pause</button>
+      <button class="hud-btn" id="btn-stop" disabled>Stop</button>
+      <button class="hud-btn next" id="btn-next" hidden>Next Level &rarr;</button>
+    </div>
+  </header>
+
+  <div class="split" id="split">
+    <div class="pane pane-code"><div id="editor"></div></div>
+    <div class="gutter" id="gutter" title="Drag to resize · double-click to reset"><span></span></div>
+    <div class="pane pane-view">
+      <div class="view-box">
+        <canvas id="view"></canvas>
+      </div>
+      <div class="status idle" id="status">Ready.</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</section>
+
+<script src="./js/nodes.js"></script>
+<script src="./js/saves.js"></script>
+<script src="./js/maze.js"></script>
+<script src="./js/sim.js"></script>
+<script src="./js/interp.js"></script>
+<script src="./js/editor.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
