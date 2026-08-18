@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jelly Cargo — Broken Gems</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<canvas id="view"></canvas>
+
+<div id="hud"></div>
+<div id="overlay"></div>
+
+<section id="title">
+  <div class="title-card">
+    <a class="quiet-link top" href="../">← Broken Gems</a>
+    <h1 class="big-title"><span>Jelly</span><span>Cargo</span></h1>
+    <p class="tag">Haul the load. Shoot the goblins. Try to keep the crates in the back.</p>
+
+    <button id="continue" class="big-btn play continue" hidden>Continue Run</button>
+    <button id="play" class="big-btn play">Start Hauling</button>
+
+    <div class="profile" id="profile" hidden>
+      <div><b id="p-best">0</b><span>best run</span></div>
+      <div><b id="p-legs">0</b><span>best legs</span></div>
+      <div><b id="p-kills">0</b><span>total kills</span></div>
+      <div><b id="p-seen">0</b><span>abilities seen</span></div>
+    </div>
+
+    <div class="transfer">
+      <button id="btn-export" class="mini-btn">Copy Save Code</button>
+      <button id="btn-import" class="mini-btn">Paste Save Code</button>
+      <button id="btn-wipe" class="mini-btn danger">Wipe Save</button>
+    </div>
+    <p class="transfer-note" id="transfer-note">Saves live in this browser. Use a save code to carry them to another computer.</p>
+
+    <div class="facts">
+      <div><b id="count-ab">0</b><span>abilities</span></div>
+      <div><b id="count-gear">0</b><span>gear items</span></div>
+      <div><b id="count-enemy">0</b><span>goblin types</span></div>
+      <div><b id="count-biome">0</b><span>biomes</span></div>
+    </div>
+
+    <div class="keys">
+      <div><kbd>↑</kbd><kbd>W</kbd> accelerate</div>
+      <div><kbd>←</kbd><kbd>→</kbd> lean &amp; drive</div>
+      <div><kbd>Mouse</kbd> aim &amp; hold to fire</div>
+      <div><kbd>F</kbd> boost <span class="dim">(needs the ability)</span></div>
+      <div><kbd>Q</kbd><kbd>R</kbd><kbd>G</kbd> ability keys</div>
+      <div><kbd>Esc</kbd> pause</div>
+    </div>
+  </div>
+</section>
+
+<script src="./js/core.js"></script>
+<script src="./js/save.js"></script>
+<script src="./js/physics.js"></script>
+<script src="./js/world.js"></script>
+<script src="./js/truck.js"></script>
+<script src="./js/enemies.js"></script>
+<script src="./js/abilities.js"></script>
+<script src="./js/shop.js"></script>
+<script src="./js/render.js"></script>
+<script src="./js/game.js"></script>
+<script src="./js/ui.js"></script>
+<script src="./js/main.js"></script>
+</body>
+</html>
