@@ -1,4 +1,4 @@
-/* Node type registry + graph helpers for "Train An AI To Compete". */
+/* Node type registry + graph helpers for "Create an Algorithm To Solve Puzzles". */
 window.BG = window.BG || {};
 (function (BG) {
   "use strict";
@@ -71,13 +71,33 @@ window.BG = window.BG || {};
 
     raycast: {
       cat: "sensing", title: "Raycast",
-      hint: "Scans tile by tile and reports what it hits first. 1 = the tile you are about to step into.",
+      hint: "Scans tile by tile. 1 = the tile you are about to step into. 'Detects' is the side of the beam that looks for the target; leave it matching 'fire' to look straight ahead.",
       ins: [{ id: "in", label: "in" }],
       outs: [{ id: "yes", label: "yes" }, { id: "no", label: "no" }, { id: "either", label: "either" }],
       fields: [
         { k: "dd", id: "dir", options: DIRS, def: "front" },
         { k: "slot", id: "dist", label: "distance", ph: "tiles" },
-        { k: "dd", id: "target", options: TARGETS, def: "wall", label: "looking for" }
+        { k: "dd", id: "target", options: TARGETS, def: "wall", label: "looking for" },
+        { k: "dd", id: "detect", options: DIRS, def: "front", label: "detects" }
+      ]
+    },
+
+    raycastAt: {
+      cat: "sensing", title: "Raycast At Raycast",
+      hint: "Fires one beam, then fires a second from wherever the first came to rest. Bends a scan around a corner.",
+      ins: [{ id: "in", label: "in" }],
+      outs: [{ id: "yes", label: "yes" }, { id: "no", label: "no" }, { id: "either", label: "either" }],
+      fields: [
+        { k: "head", label: "beam 1" },
+        { k: "dd", id: "detect1", options: DIRS, def: "front", label: "detects" },
+        { k: "dd", id: "dir1", options: DIRS, def: "front", label: "fire" },
+        { k: "slot", id: "dist1", label: "distance", ph: "tiles" },
+        { k: "toggle", id: "stop1", def: true, label: "stop at target" },
+        { k: "dd", id: "target1", options: TARGETS, def: "wall", label: "looking for" },
+        { k: "head", label: "beam 2" },
+        { k: "slot", id: "dist2", label: "distance", ph: "tiles" },
+        { k: "dd", id: "dir2", options: DIRS, def: "left", label: "fire" },
+        { k: "dd", id: "target2", options: TARGETS, def: "goal", label: "looking for" }
       ]
     },
 
@@ -162,6 +182,7 @@ window.BG = window.BG || {};
     ]},
     { cat: "sensing", items: [
       { kind: "node", type: "raycast" },
+      { kind: "node", type: "raycastAt" },
       { kind: "expr", ex: "sense", label: "Sense", sub: "true / false" },
       { kind: "expr", ex: "dist",  label: "Distance", sub: "open tiles" }
     ]},
@@ -202,7 +223,8 @@ window.BG = window.BG || {};
     var n = { id: id, type: type, x: x, y: y, fields: {}, slots: {} };
     (def.fields || []).forEach(function (f) {
       if (f.k === "dd") n.fields[f.id] = f.def || "";
-      else n.slots[f.id] = null;               // null == empty slot
+      else if (f.k === "toggle") n.fields[f.id] = !!f.def;
+      else if (f.k === "slot") n.slots[f.id] = null;               // null == empty slot
     });
     return n;
   };
@@ -220,12 +242,15 @@ window.BG = window.BG || {};
     return true;
   };
 
-  /* One wire per output port; an input may be fed by many. */
+  /* Every port takes as many wires as you like, in or out. Only an exact
+     duplicate of an existing wire is refused. */
   BG.connect = function (g, fromNode, fromPort, toNode, toPort) {
     if (fromNode === toNode) return null;
-    g.wires = g.wires.filter(function (w) {
-      return !(w.from.n === fromNode && w.from.p === fromPort);
+    var dup = g.wires.some(function (w) {
+      return w.from.n === fromNode && w.from.p === fromPort &&
+             w.to.n === toNode && w.to.p === toPort;
     });
+    if (dup) return null;
     var w = { id: "w" + (g.seq++), from: { n: fromNode, p: fromPort }, to: { n: toNode, p: toPort } };
     g.wires.push(w);
     return w;
@@ -253,7 +278,7 @@ window.BG = window.BG || {};
   BG.emptyExpr = function (kind) {
     if (kind === "cmp")   return { k: "cmp", op: ">", a: null, b: null };
     if (kind === "ar")    return { k: "ar",  op: "+", a: null, b: null };
-    if (kind === "sense") return { k: "sense", dir: "front", d: { k: "lit", v: "1" }, target: "wall" };
+    if (kind === "sense") return { k: "sense", dir: "front", d: { k: "lit", v: "1" }, target: "wall", detect: "front" };
     if (kind === "dist")  return { k: "dist", dir: "front" };
     return null;
   };
@@ -283,7 +308,7 @@ window.BG = window.BG || {};
       var dv = BG.evalExpr(e.d, ctx);
       var tiles = dv === null ? null
         : Math.abs(typeof dv === "number" ? dv : parseFloat(dv) || 0) * BG.UNIT;
-      return ctx.world.rayAnswer(e.dir, tiles, e.target);
+      return ctx.world.rayAnswer(e.dir, tiles, e.target, e.detect);
     }
 
     /* How many tiles you can actually move before hitting something —

@@ -1,4 +1,4 @@
-/* Train An AI To Compete — same flat dark language as the site. */
+/* Create an Algorithm To Solve Puzzles — same flat dark language as the site. */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -160,6 +160,19 @@ body.ready #scr-menu .mask:nth-of-type(2) .game-title { animation: unmask 0.8s v
 .slot-mode.infinite { border-color: #7a5f9e; color: #ab8ed2; }
 
 .slot-sub { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.06em; }
+
+.slot-icon {
+  width: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--dim);
+  border-left: 1px solid var(--line);
+  transition: color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.slot-icon:hover { color: var(--white); background: var(--raised); }
+
+.slot-row-actions { display: flex; gap: 10px; margin-top: 20px; }
+.slot-row-actions .big-btn { margin-top: 0; }
 
 .slot-del {
   width: 46px;
@@ -473,6 +486,20 @@ body.ready #scr-menu .mask:nth-of-type(2) .game-title { animation: unmask 0.8s v
 .wires { position: absolute; overflow: visible; pointer-events: none; }
 .ed-nodes { position: absolute; left: 0; top: 0; }
 
+/* wire hover + cut badge */
+.wire-hit { pointer-events: stroke; cursor: pointer; }
+
+.wire-x {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s var(--ease);
+}
+.wire-x circle { fill: #170e0e; stroke: #c1595c; stroke-width: 1.4; }
+.wire-x-mark { stroke: #c1595c; stroke-width: 1.9; stroke-linecap: round; fill: none; }
+.wire-g:hover .wire-x { opacity: 1; pointer-events: all; cursor: pointer; }
+.wire-x:hover circle { fill: #c1595c; stroke: #d97e80; }
+.wire-x:hover .wire-x-mark { stroke: #0b0b0b; }
+
 .marquee {
   position: absolute;
   border: 1px solid var(--white);
@@ -563,6 +590,34 @@ body.ready #scr-menu .mask:nth-of-type(2) .game-title { animation: unmask 0.8s v
 .dd-btn:hover { border-color: var(--white); background: #151515; }
 .dd-caret { color: var(--dim); font-size: 9px; }
 .dd-mini { padding: 3px 6px; font-family: var(--mono); font-size: 11px; }
+
+/* yes / no toggle */
+.toggle {
+  padding: 3px 11px;
+  background: #0c0c0c;
+  border: 1px solid var(--line-2);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.toggle.on { border-color: #3fb0a0; color: #6fc4b6; background: #0b1413; }
+.toggle:hover { border-color: var(--white); color: var(--text); }
+
+/* grouping heading inside a node */
+.fhead {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-top: 1px solid #212121;
+  padding-top: 8px;
+  margin-top: 2px;
+}
+.nfields > .fhead:first-child { border-top: none; padding-top: 0; margin-top: 0; }
 
 .slot-host { display: inline-flex; align-items: center; }
 .slot-host.drop { outline: 1px dashed var(--white); outline-offset: 2px; }

@@ -3,9 +3,27 @@ window.BG = window.BG || {};
 (function (BG) {
   "use strict";
 
+  var NS = "http://www.w3.org/2000/svg";
   var WOFF = 8000;          // svg is offset so negative world coords still draw
   var MINZ = 0.25, MAXZ = 2.0;
   var GRID = 28;
+  var PAN_SPEED = 900;      // px/sec of view movement from the keyboard
+  var ZOOM_RATE = 2.5;      // zoom multiplier per second while held
+
+  /* Each entry is the change applied to the pan offset, so pressing "right"
+     moves the view right by sliding the content left. */
+  var PAN_KEYS = {
+    ArrowLeft: [1, 0], a: [1, 0],
+    ArrowRight: [-1, 0], d: [-1, 0],
+    ArrowUp: [0, 1], w: [0, 1],
+    ArrowDown: [0, -1], s: [0, -1]
+  };
+
+  // e zooms in, q zooms out, about the middle of the view
+  var ZOOM_KEYS = { e: 1, q: -1 };
+
+  function keyName(e) { return e.key.length === 1 ? e.key.toLowerCase() : e.key; }
+  function isViewKey(k) { return !!(PAN_KEYS[k] || ZOOM_KEYS[k]); }
 
   // ── small dom helper ──────────────────────────────────────────────────────
   function el(tag, cls, txt) {
@@ -114,6 +132,9 @@ window.BG = window.BG || {};
     this.nodeEls = {};
     this.drag = null;
     this.locked = false;           // true while the program is running
+    this.viewKeys = {};            // pan/zoom keys currently held
+    this.viewRAF = null;
+    this.viewFast = false;
 
     this.build();
     this.renderAll();
@@ -156,12 +177,82 @@ window.BG = window.BG || {};
     this.applyTransform();
 
     this.keyHandler = function (e) { self.onKey(e); };
+    this.keyUpHandler = function (e) { self.onKeyUp(e); };
+    this.blurHandler = function () { self.viewKeys = {}; };
+
+    /* Anywhere in the editor — nodes, canvas, palette — and on the floating
+       menus, right-click belongs to us, not to the browser. */
+    this.ctxHandler = function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (self.root.contains(t) || t.closest(".float")) e.preventDefault();
+    };
+
     document.addEventListener("keydown", this.keyHandler);
+    document.addEventListener("keyup", this.keyUpHandler);
+    document.addEventListener("contextmenu", this.ctxHandler);
+    window.addEventListener("blur", this.blurHandler);
   };
 
   P.destroy = function () {
     document.removeEventListener("keydown", this.keyHandler);
+    document.removeEventListener("keyup", this.keyUpHandler);
+    document.removeEventListener("contextmenu", this.ctxHandler);
+    window.removeEventListener("blur", this.blurHandler);
+    if (this.viewRAF) cancelAnimationFrame(this.viewRAF);
+    this.viewRAF = null;
     closeOverlay();
+  };
+
+  // ── keyboard pan + zoom ───────────────────────────────────────────────────
+  /* One loop drives both. Runs only while a view key is held, and stops
+     itself once none are. */
+  P.startViewLoop = function () {
+    if (this.viewRAF) return;
+    var self = this;
+    var last = performance.now();
+
+    this.viewRAF = requestAnimationFrame(function tick(now) {
+      var dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+
+      var dx = 0, dy = 0, dz = 0;
+      Object.keys(self.viewKeys).forEach(function (k) {
+        if (PAN_KEYS[k]) { dx += PAN_KEYS[k][0]; dy += PAN_KEYS[k][1]; }
+        if (ZOOM_KEYS[k]) dz += ZOOM_KEYS[k];
+      });
+
+      if ((!dx && !dy && !dz) || !self.root.isConnected) { self.viewRAF = null; return; }
+
+      var boost = self.viewFast ? 2.5 : 1;
+
+      if (dx || dy) {
+        var speed = PAN_SPEED * boost;
+        self.pan.x += dx * speed * dt;
+        self.pan.y += dy * speed * dt;
+      }
+
+      if (dz) {
+        // hold the middle of the viewport still while the scale changes
+        var r = self.canvas.getBoundingClientRect();
+        var mx = r.width / 2, my = r.height / 2;
+        var wx = (mx - self.pan.x) / self.zoom;
+        var wy = (my - self.pan.y) / self.zoom;
+
+        var z = self.zoom * Math.pow(ZOOM_RATE, dz * boost * dt);
+        self.zoom = Math.max(MINZ, Math.min(MAXZ, z));
+        self.pan.x = mx - wx * self.zoom;
+        self.pan.y = my - wy * self.zoom;
+      }
+
+      self.applyTransform();
+      self.viewRAF = requestAnimationFrame(tick);
+    });
+  };
+
+  P.onKeyUp = function (e) {
+    delete this.viewKeys[keyName(e)];
+    this.viewFast = e.shiftKey;
   };
 
   // ── palette ───────────────────────────────────────────────────────────────
@@ -445,11 +536,17 @@ window.BG = window.BG || {};
     if (def.fields.length) {
       var fields = el("div", "nfields");
       def.fields.forEach(function (f) {
+        if (f.k === "head") {
+          fields.appendChild(el("div", "fhead", f.label));
+          return;
+        }
         var row = el("div", "frow");
         if (f.label) row.appendChild(el("span", "flabel", f.label));
 
         if (f.k === "dd") {
           row.appendChild(self.makeDropdown(n, f));
+        } else if (f.k === "toggle") {
+          row.appendChild(self.makeToggle(n, f));
         } else {
           row.appendChild(self.makeSlot(
             function () { return n.slots[f.id]; },
@@ -470,6 +567,29 @@ window.BG = window.BG || {};
     this.nodeLayer.appendChild(box);
     this.nodeEls[n.id] = box;
     return box;
+  };
+
+  P.makeToggle = function (n, f) {
+    var self = this;
+    var btn = el("button", "toggle");
+
+    function paint() {
+      var on = n.fields[f.id] !== false;
+      btn.classList.toggle("on", on);
+      btn.textContent = on ? "yes" : "no";
+    }
+    paint();
+
+    btn.addEventListener("pointerdown", function (e) { e.stopPropagation(); });
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (self.locked) return;
+      self.pushUndo();
+      n.fields[f.id] = n.fields[f.id] === false;
+      paint();
+      self.emit();
+    });
+    return btn;
   };
 
   P.makeDropdown = function (n, f) {
@@ -544,6 +664,9 @@ window.BG = window.BG || {};
             function (nv) { var c = get(); c.d = nv; set(c); }, "units"));
           sens.appendChild(self.miniPick(BG.TARGETS, function () { return get().target; },
             function (id) { var c = get(); c.target = id; set(c); }));
+          sens.appendChild(el("span", "expr-word", "det"));
+          sens.appendChild(self.miniPick(BG.DIRS, function () { return get().detect || "front"; },
+            function (id) { var c = get(); c.detect = id; set(c); }));
         }
 
         var srm = el("button", "chip-x", "×");
@@ -678,8 +801,21 @@ window.BG = window.BG || {};
       if (!a || !b) return;
       var src = self.graph.nodes[w.from.n];
       var color = BG.CATS[BG.NODES[src.type].cat].color;
-      self.svg.appendChild(self.wirePath(a, b, color, w.id,
-        self.sel[w.from.n] || self.sel[w.to.n]));
+      var hot = self.sel[w.from.n] || self.sel[w.to.n];
+
+      var grp = document.createElementNS(NS, "g");
+      grp.setAttribute("class", "wire-g");
+
+      // a fat invisible copy so the wire is easy to hover
+      var hit = self.wirePath(a, b, "none", null, false);
+      hit.setAttribute("class", "wire-hit");
+      hit.setAttribute("stroke", "rgba(0,0,0,0)");
+      hit.setAttribute("stroke-width", "16");
+      grp.appendChild(hit);
+
+      grp.appendChild(self.wirePath(a, b, color, w.id, hot));
+      grp.appendChild(self.wireBadge(w, (a.x + b.x) / 2, (a.y + b.y) / 2));
+      self.svg.appendChild(grp);
     });
 
     if (this.drag && this.drag.kind === "wire") {
@@ -692,6 +828,36 @@ window.BG = window.BG || {};
         this.svg.appendChild(p);
       }
     }
+  };
+
+  /* Red x that appears at a wire's midpoint on hover. Click to cut it. */
+  P.wireBadge = function (w, mx, my) {
+    var self = this;
+    var badge = document.createElementNS(NS, "g");
+    badge.setAttribute("class", "wire-x");
+    badge.setAttribute("transform", "translate(" + (mx + WOFF) + "," + (my + WOFF) + ")");
+
+    var circ = document.createElementNS(NS, "circle");
+    circ.setAttribute("r", "9");
+    badge.appendChild(circ);
+
+    ["M-3.4 -3.4 L3.4 3.4", "M3.4 -3.4 L-3.4 3.4"].forEach(function (d) {
+      var p = document.createElementNS(NS, "path");
+      p.setAttribute("d", d);
+      p.setAttribute("class", "wire-x-mark");
+      badge.appendChild(p);
+    });
+
+    badge.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (self.locked) return;
+      self.pushUndo();
+      self.graph.wires = self.graph.wires.filter(function (x) { return x.id !== w.id; });
+      self.drawWires();
+      self.emit();
+    });
+    return badge;
   };
 
   P.wirePath = function (a, b, color, id, hot) {
@@ -848,13 +1014,25 @@ window.BG = window.BG || {};
 
   // ── input ─────────────────────────────────────────────────────────────────
   P.onKey = function (e) {
-    if (this.locked) return;
     if (!this.root.isConnected) return;
     var t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" ||
+              t.tagName === "SELECT" || t.isContentEditable)) return;
     if (!this.root.closest("body")) return;
 
     var mod = e.ctrlKey || e.metaKey;
+    this.viewFast = e.shiftKey;
+
+    /* Arrow keys and WASD pan; E and Q zoom. Allowed while a program is
+       running too, so you can follow the highlighted node without a mouse. */
+    if (!mod && isViewKey(keyName(e))) {
+      e.preventDefault();
+      this.viewKeys[keyName(e)] = true;
+      this.startViewLoop();
+      return;
+    }
+
+    if (this.locked) return;
 
     if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); this.undo(); return; }
     if (mod && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) {
@@ -889,8 +1067,6 @@ window.BG = window.BG || {};
       self.pan.y = my - wy * self.zoom;
       self.applyTransform();
     }, { passive: false });
-
-    this.canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
     this.canvas.addEventListener("pointerdown", function (e) {
       closeOverlay();
@@ -1035,18 +1211,6 @@ window.BG = window.BG || {};
             BG.connect(self.graph, portEl.dataset.node, portEl.dataset.port, d.node, d.port);
           }
           self.emit();
-        } else if (!portEl && d.side === "out") {
-          // dropping an output on empty space clears that wire
-          var had = self.graph.wires.some(function (w) {
-            return w.from.n === d.node && w.from.p === d.port;
-          });
-          if (had) {
-            self.pushUndo();
-            self.graph.wires = self.graph.wires.filter(function (w) {
-              return !(w.from.n === d.node && w.from.p === d.port);
-            });
-            self.emit();
-          }
         }
       }
 

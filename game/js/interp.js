@@ -27,7 +27,7 @@ window.BG = window.BG || {};
     // one watcher per `while` block
     this.whiles = Object.keys(this.g.nodes)
       .filter(function (id) { return self.g.nodes[id].type === "while"; })
-      .map(function (id) { return { id: id, fiber: null }; });
+      .map(function (id) { return { id: id, fibers: [] }; });
 
     var start = this.nodeOfType("start");
     if (start) this.spawnAt(start.id);
@@ -41,11 +41,18 @@ window.BG = window.BG || {};
     return id ? g.nodes[id] : null;
   };
 
-  BG.Interp.prototype.wireTarget = function (nodeId, port) {
-    var w = this.g.wires.filter(function (w) {
+  /* A port may carry any number of wires, so this always returns a list.
+     Following a port with several wires forks the branch. */
+  BG.Interp.prototype.wireTargets = function (nodeId, port) {
+    var seen = {};
+    return this.g.wires.filter(function (w) {
       return w.from.n === nodeId && w.from.p === port;
-    })[0];
-    return w ? w.to.n : null;
+    }).map(function (w) { return w.to.n; })
+      .filter(function (n) {
+        if (seen[n]) return false;
+        seen[n] = true;
+        return true;
+      });
   };
 
   // ── fibers ────────────────────────────────────────────────────────────────
@@ -92,6 +99,12 @@ window.BG = window.BG || {};
     return isNaN(n) ? (dflt === undefined ? null : dflt) : n;
   };
 
+  /* A distance slot in tiles, or null when left blank (= unlimited). */
+  BG.Interp.prototype.slotTiles = function (node, key) {
+    var d = this.slotNum(node, key, null);
+    return d === null ? null : Math.abs(d) * BG.UNIT;
+  };
+
   BG.Interp.prototype.condFn = function (node, key) {
     var self = this;
     if (BG.exprIsEmpty(node.slots[key])) return null;     // blank == run forever
@@ -124,22 +137,27 @@ window.BG = window.BG || {};
   BG.Interp.prototype.updateWhiles = function () {
     var self = this;
     this.whiles.forEach(function (w) {
-      var watched = self.wireTarget(w.id, "while");
-      var doTarget = self.wireTarget(w.id, "do");
-      var active = watched && self.fibers.some(function (f) {
-        return f.node === watched && f !== w.fiber;
+      var watched = self.wireTargets(w.id, "while");
+      var doTargets = self.wireTargets(w.id, "do");
+      var active = watched.length && self.fibers.some(function (f) {
+        return watched.indexOf(f.node) !== -1 && w.fibers.indexOf(f) === -1;
       });
 
-      if (active && doTarget) {
-        if (!w.fiber || !w.fiber.node) w.fiber = self.spawnAt(doTarget);
-      } else if (w.fiber) {
-        if (w.fiber.node) self.killFiber(w.fiber);
-        w.fiber = null;
+      if (active && doTargets.length) {
+        w.fibers = w.fibers.filter(function (fb) { return fb.node; });
+        if (!w.fibers.length) {
+          w.fibers = doTargets.map(function (t) { return self.spawnAt(t); })
+                              .filter(Boolean);
+        }
+      } else if (w.fibers.length) {
+        w.fibers.forEach(function (fb) { if (fb.node) self.killFiber(fb); });
+        w.fibers = [];
       }
     });
   };
 
   BG.Interp.prototype.runFiber = function (f, dt) {
+    var self = this;
     var hops = 0;
 
     while (f.node && hops < MAX_HOPS) {
@@ -153,16 +171,17 @@ window.BG = window.BG || {};
 
       hops++;
 
-      // extra ports fork a new branch; the first port keeps this fiber
+      /* Extra ports fork new branches. So do extra wires on the same port —
+         the first target keeps this fiber, every other one gets its own. */
       var ports = Array.isArray(out) ? out : [out];
       for (var i = 1; i < ports.length; i++) {
-        var extra = this.wireTarget(node.id, ports[i]);
-        if (extra) this.spawnAt(extra);
+        this.wireTargets(node.id, ports[i]).forEach(function (t) { self.spawnAt(t); });
       }
 
-      var next = this.wireTarget(node.id, ports[0]);
-      if (!next) { this.killFiber(f); return; }
-      f.node = next;
+      var nexts = this.wireTargets(node.id, ports[0]);
+      if (!nexts.length) { this.killFiber(f); return; }
+      for (var k = 1; k < nexts.length; k++) this.spawnAt(nexts[k]);
+      f.node = nexts[0];
       f.entered = false;
     }
 
@@ -254,10 +273,24 @@ window.BG = window.BG || {};
       }
 
       case "raycast": {
-        var d = this.slotNum(node, "dist", null);
-        var tiles = d === null ? null : Math.abs(d) * BG.UNIT;
-        var yes = W.rayAnswer(node.fields.dir, tiles, node.fields.target);
+        var yes = W.rayAnswer(node.fields.dir, this.slotTiles(node, "dist"),
+                              node.fields.target, node.fields.detect);
         return [yes ? "yes" : "no", "either"];
+      }
+
+      case "raycastAt": {
+        var hit = W.rayAtRay({
+          detect1: node.fields.detect1,
+          dir1:    node.fields.dir1,
+          dist1:   this.slotTiles(node, "dist1"),
+          target1: node.fields.target1,
+          stop1:   node.fields.stop1 !== false,
+          dir2:    node.fields.dir2,
+          dist2:   this.slotTiles(node, "dist2"),
+          target2: node.fields.target2,
+          detect2: null
+        });
+        return [hit ? "yes" : "no", "either"];
       }
 
       case "wait": {

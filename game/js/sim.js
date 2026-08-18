@@ -156,44 +156,104 @@ window.BG = window.BG || {};
   };
 
   // ── raycast ───────────────────────────────────────────────────────────────
-  /* Scans one whole tile at a time and reports the first thing hit.
-     `dist` is the tile number the hit landed on: 1 means the tile you are
-     about to step into. Diagonal facings snap to the nearest cardinal so the
-     scan always follows the grid.
-     Returns { type:"wall"|"enemy"|"goal"|null, dist }.                      */
-  BG.World.prototype.raycast = function (dir, maxTiles) {
+  /* A direction name resolved to one cardinal grid step, relative to the way
+     the player is facing. Diagonal facings snap to the nearest cardinal. */
+  BG.World.prototype.dirStep = function (dir) {
     var v = this.dirVector(dir);
-    var sx, sy;
-    if (Math.abs(v.x) >= Math.abs(v.y)) { sx = v.x >= 0 ? 1 : -1; sy = 0; }
-    else                                { sx = 0; sy = v.y >= 0 ? 1 : -1; }
+    if (Math.abs(v.x) >= Math.abs(v.y)) return { x: v.x >= 0 ? 1 : -1, y: 0 };
+    return { x: 0, y: v.y >= 0 ? 1 : -1 };
+  };
 
+  /* What occupies one tile. Walls win, then monsters, then the gem. */
+  BG.World.prototype.tileHolds = function (cx, cy) {
+    if (this.isWall(cx, cy)) return "wall";
+    for (var i = 0; i < this.ghosts.length; i++) {
+      var g = this.ghosts[i];
+      if (Math.floor(g.x) === cx && Math.floor(g.y) === cy) return "enemy";
+    }
+    if (cx === this.level.goal.x && cy === this.level.goal.y) return "goal";
+    return "air";
+  };
+
+  /* Scans one whole tile at a time and reports the first thing hit along the
+     beam's own path. Used by the Distance sensor.
+     Returns { type:"wall"|"enemy"|"goal"|null, dist }.                       */
+  BG.World.prototype.raycast = function (dir, maxTiles) {
+    var s = this.dirStep(dir);
     var max = maxTiles === null ? (this.W + this.H)
                                 : Math.max(0, Math.round(maxTiles));
     var tx = Math.floor(this.player.x), ty = Math.floor(this.player.y);
 
     for (var step = 1; step <= max; step++) {
-      var cx = tx + sx * step, cy = ty + sy * step;
-
-      if (this.isWall(cx, cy)) return { type: "wall", dist: step };
-
-      for (var i = 0; i < this.ghosts.length; i++) {
-        var g = this.ghosts[i];
-        if (Math.floor(g.x) === cx && Math.floor(g.y) === cy) {
-          return { type: "enemy", dist: step };
-        }
-      }
-
-      if (cx === this.level.goal.x && cy === this.level.goal.y) {
-        return { type: "goal", dist: step };
-      }
+      var what = this.tileHolds(tx + s.x * step, ty + s.y * step);
+      if (what !== "air") return { type: what, dist: step };
     }
     return { type: null, dist: max };
   };
 
-  BG.World.prototype.rayAnswer = function (dir, maxTiles, target) {
-    var hit = this.raycast(dir, maxTiles);
-    if (target === "air") return hit.type === null;
-    return hit.type === target;
+  /* One targeted beam, fired from any tile.
+
+     It travels from (tx,ty) along `dir`, one tile per step, and is always
+     stopped by a wall in its own path. At every step it probes for `target`
+     on the tile that `detect` points at — that is the side of the beam doing
+     the looking. When `detect` matches `dir` the beam looks along itself,
+     which is the plain behaviour.
+
+     `stopAtTarget` decides whether spotting the target ends the beam early.
+     "air" is special: it asks whether the probed line stays clear the whole
+     way, rather than whether any single tile happens to be empty.
+
+     Returns { found, dist, x, y } where x,y is the last free tile the beam
+     reached — the launch point for a follow-up beam.                        */
+  BG.World.prototype.probeRay = function (tx, ty, dir, maxTiles, target, detect, stopAtTarget) {
+    var s = this.dirStep(dir);
+    var off = (!detect || detect === dir) ? { x: 0, y: 0 } : this.dirStep(detect);
+    var max = maxTiles === null ? (this.W + this.H)
+                                : Math.max(0, Math.round(maxTiles));
+    var sideways = !(off.x === 0 && off.y === 0);
+    /* Looking straight ahead, "air" asks whether the path stays clear the
+       whole way — the useful question is "can I walk this far". Looking off
+       to one side it asks the opposite: whether a gap shows up anywhere along
+       the wall you are scanning. */
+    var wholeLine = target === "air" && !sideways;
+
+    var endX = tx, endY = ty;
+    var hitAt = null;        // step the target was first seen on
+    var clear = 0;           // how far the probed line stayed open
+
+    for (var step = 1; step <= max; step++) {
+      var nx = tx + s.x * step, ny = ty + s.y * step;
+      var blocked = this.isWall(nx, ny);
+      var what = this.tileHolds(nx + off.x, ny + off.y);
+
+      if (!blocked) { endX = nx; endY = ny; }
+      if (what === target && hitAt === null) hitAt = step;
+      if (!blocked && what === "air") clear = step;
+
+      if (blocked) break;
+      if (wholeLine && what !== "air") break;
+      if (!wholeLine && hitAt !== null && stopAtTarget) break;
+    }
+
+    return {
+      found: wholeLine ? clear >= max : hitAt !== null,
+      dist: hitAt === null ? clear : hitAt,
+      x: endX, y: endY
+    };
+  };
+
+  BG.World.prototype.rayAnswer = function (dir, maxTiles, target, detect) {
+    return this.probeRay(Math.floor(this.player.x), Math.floor(this.player.y),
+                         dir, maxTiles, target, detect, true).found;
+  };
+
+  /* Raycast At Raycast: fire one beam, then fire a second from wherever the
+     first came to rest. Lets a scan bend around a corner. */
+  BG.World.prototype.rayAtRay = function (c) {
+    var first = this.probeRay(Math.floor(this.player.x), Math.floor(this.player.y),
+                              c.dir1, c.dist1, c.target1, c.detect1, c.stop1);
+    return this.probeRay(first.x, first.y,
+                         c.dir2, c.dist2, c.target2, c.detect2, true).found;
   };
 
   // ── update ────────────────────────────────────────────────────────────────
@@ -463,14 +523,27 @@ window.BG = window.BG || {};
     ctx.restore();
   };
 
-  /* Cartoon ball with hands and feet. */
+  /* Cartoon ball with hands and feet.
+
+     Every limb is placed in the player's own frame — forward and right taken
+     from `facing` — then projected to screen, so the whole model turns as one
+     piece. Side-stepping does not change `facing`, so the model keeps looking
+     where it is aimed while it slides. */
   BG.World.prototype.drawPlayer = function (ctx, x, y, TS) {
     var r = TS * 0.30;
     var bob = this.moving ? Math.abs(Math.sin(this.walkPhase)) * r * 0.16 : 0;
     var swing = this.moving ? Math.sin(this.walkPhase) : 0;
     var bodyY = y - r * 0.75 - bob;
+
     var a = this.player.facing * Math.PI / 180;
-    var fx = Math.cos(a), fy = Math.sin(a) * SQUASH;
+    var fx = Math.cos(a),  fy = Math.sin(a);      // forward
+    var rx = -Math.sin(a), ry = Math.cos(a);      // the model's right
+
+    // local (forward, right) -> screen offset, carrying the vertical squash
+    function ox(u, v) { return u * fx + v * rx; }
+    function oy(u, v) { return (u * fy + v * ry) * SQUASH; }
+
+    var lean = Math.atan2(fy * SQUASH, fx);       // screen angle of "forward"
 
     ctx.save();
 
@@ -480,22 +553,33 @@ window.BG = window.BG || {};
     ctx.ellipse(x, y, r * 0.85, r * 0.38, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // feet
+    // feet, stepping along the forward axis
     ctx.fillStyle = "#8f8f8f";
     [-1, 1].forEach(function (s) {
+      var u = s * swing * r * 0.30, v = s * r * 0.42;
       ctx.beginPath();
-      ctx.ellipse(x + s * r * 0.42, y - r * 0.08 + s * swing * r * 0.22,
-                  r * 0.30, r * 0.17, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + ox(u, v), y - r * 0.08 + oy(u, v),
+                  r * 0.30, r * 0.17, lean, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // hands
-    ctx.fillStyle = "#b9b9b9";
-    [-1, 1].forEach(function (s) {
+    /* Hands, swinging opposite the feet. Facing along the screen puts one
+       hand nearer the camera and one further away, so they are depth-sorted
+       around the body instead of both hiding behind it. */
+    var hands = [-1, 1].map(function (s) {
+      var u = -s * swing * r * 0.34, v = s * r * 1.08;
+      var dy = oy(u, v);
+      return { x: x + ox(u, v), y: bodyY + r * 0.18 + dy, depth: dy };
+    }).sort(function (p, q) { return p.depth - q.depth; });
+
+    function paintHand(h) {
+      ctx.fillStyle = "#b9b9b9";
       ctx.beginPath();
-      ctx.arc(x + s * r * 1.02, bodyY + r * 0.18 - s * swing * r * 0.28, r * 0.24, 0, Math.PI * 2);
+      ctx.arc(h.x, h.y, r * 0.24, 0, Math.PI * 2);
       ctx.fill();
-    });
+    }
+
+    paintHand(hands[0]);                             // the far hand
 
     // body
     ctx.fillStyle = "#ededed";
@@ -507,13 +591,15 @@ window.BG = window.BG || {};
     ctx.arc(x, bodyY + r * 0.30, r * 0.86, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.fill();
 
+    paintHand(hands[1]);                             // the near hand, over the body
+
     // eyes look where you face
     ctx.fillStyle = "#1a1a1a";
     [-1, 1].forEach(function (s) {
-      var ex = x + fx * r * 0.34 - fy * s * r * 0.38;
-      var ey = bodyY + fy * r * 0.34 + fx * s * r * 0.38 * SQUASH - r * 0.12;
+      var u = r * 0.34, v = s * r * 0.38;
       ctx.beginPath();
-      ctx.ellipse(ex, ey, r * 0.13, r * 0.17, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + ox(u, v), bodyY - r * 0.12 + oy(u, v),
+                  r * 0.13, r * 0.17, 0, 0, Math.PI * 2);
       ctx.fill();
     });
 
