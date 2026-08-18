@@ -91,6 +91,16 @@ window.BG = window.BG || {};
         burst(e.currentTarget, function () { startGame(sv); });
       });
 
+      var dl = el("button", "slot-icon");
+      dl.title = "Download this save as a file";
+      dl.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+        '<path d="M8 1.8 V9.8 M4.6 6.4 L8 9.8 L11.4 6.4 M2.6 13.4 H13.4" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      dl.addEventListener("click", function (e) {
+        e.stopPropagation();
+        exportSave(sv);
+      });
+
       var del = el("button", "slot-del", "×");
       del.title = "Delete save";
       del.addEventListener("click", function () {
@@ -100,11 +110,72 @@ window.BG = window.BG || {};
       });
 
       row.appendChild(main);
+      row.appendChild(dl);
       row.appendChild(del);
       list.appendChild(row);
     });
 
     show("scr-slots");
+  }
+
+  // ── save files (for moving a save between computers) ─────────────────────
+  function safeName(s) {
+    return (s || "save").replace(/[^a-z0-9 _-]/gi, "").trim()
+                        .replace(/[ ]+/g, "-").toLowerCase() || "save";
+  }
+
+  function exportSave(sv) {
+    var payload = { app: "brokengems.trainai", ver: 1, exported: Date.now(), save: sv };
+    var url = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = safeName(sv.name) + ".bgsave.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function importSave(file) {
+    var rd = new FileReader();
+    rd.onerror = function () { alert("Could not read that file."); };
+    rd.onload = function () {
+      var data;
+      try { data = JSON.parse(rd.result); }
+      catch (e) { alert("That file is not valid JSON."); return; }
+
+      var sv = data && data.save ? data.save : data;
+      if (!sv || !sv.mode || !sv.graphs) {
+        alert("That does not look like a Broken Gems save file.");
+        return;
+      }
+
+      // always land as a new slot so an import can never clobber your progress
+      var copy = BG.clone(sv);
+      copy.id = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      copy.updated = Date.now();
+      var taken = BG.Saves.list().map(function (s) { return s.name; });
+      if (taken.indexOf(copy.name) !== -1) copy.name = copy.name + " (imported)";
+
+      if (!BG.Saves.save(copy)) {
+        alert("Could not save — this browser is blocking local storage.");
+        return;
+      }
+      openSlots();
+    };
+    rd.readAsText(file);
+  }
+
+  function initSlots() {
+    var file = $("#import-file");
+    $("#import-btn").addEventListener("click", function () {
+      file.value = "";
+      file.click();
+    });
+    file.addEventListener("change", function () {
+      if (file.files && file.files[0]) importSave(file.files[0]);
+    });
   }
 
   // ── new save ──────────────────────────────────────────────────────────────
@@ -443,6 +514,7 @@ window.BG = window.BG || {};
   // ── boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", function () {
     initMenu();
+    initSlots();
     initNew();
     initPlay();
     initSplit();

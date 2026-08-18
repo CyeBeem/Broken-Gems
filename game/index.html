@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Train An AI To Compete — Broken Gems</title>
+<title>Create an Algorithm To Solve Puzzles — Broken Gems</title>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -12,8 +12,8 @@
 <section class="screen center" id="scr-menu">
   <div class="menu-wrap">
     <a class="home-link" href="../">&larr; Broken Gems</a>
-    <div class="mask"><h1 class="game-title">Train An AI</h1></div>
-    <div class="mask"><h1 class="game-title">To Compete</h1></div>
+    <div class="mask"><h1 class="game-title">Create an Algorithm</h1></div>
+    <div class="mask"><h1 class="game-title">To Solve Puzzles</h1></div>
     <p class="menu-sub">Wire up a program. Send it into the maze. Watch it fail, then fix it.</p>
     <button class="big-btn" id="play-btn">Play</button>
   </div>
@@ -25,7 +25,11 @@
     <button class="back-link" data-back="scr-menu">&larr; Back</button>
     <h2 class="scr-title">Save Slots</h2>
     <div id="slot-list" class="slot-list"></div>
-    <button class="big-btn ghost" id="new-save-btn">+ New Save</button>
+    <div class="slot-row-actions">
+      <button class="big-btn ghost" id="new-save-btn">+ New Save</button>
+      <button class="big-btn ghost" id="import-btn">Import Save File</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json,.json" hidden>
   </div>
 </section>
 
