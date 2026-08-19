@@ -84,8 +84,9 @@ window.JC = window.JC || {};
 
     // put the truck on the ground at the start
     var sx = 300;
-    this.truck = new JC.Truck(this.world, sx, this.terrain.heightAt(sx) - 120);
+    this.truck = new JC.Truck(this.world, sx, this.terrain.heightAt(sx) - 70);
     this.startX = sx;
+    this.minX = sx - 260;                       // hard left edge of the world
     this.truckHp = this.stats.truckHp;
     this.cargoHp = this.stats.cargoHp;
     for (var i = 0; i < 4; i++) this.truck.loadCrate("boxes");
@@ -414,6 +415,7 @@ window.JC = window.JC || {};
 
     this.updateProgress(dt);
     this.checkFall();
+    this.holdLeftEdge();
 
     this.autoSaveT = (this.autoSaveT || 0) + dt;
     if (this.autoSaveT > 12) { this.autoSaveT = 0; JC.Save.saveRun(this); }
@@ -440,6 +442,7 @@ window.JC = window.JC || {};
       this.truck.boosting = 0;
     }
     this.truck.rechargeFuel(dt, s);
+    this.truck.updateSquash(dt);
     this.truck.selfRight(dt);
 
     // keyed abilities
@@ -646,25 +649,68 @@ window.JC = window.JC || {};
     }
   };
 
-  /* Crates settle toward their slot. Weak by default so a bad landing still
-     throws them, stronger with every point of cargo grip you buy. */
-  G.settleCargo = function (dt) {
-    var k = Math.min(0.5, (0.9 + this.stats.cargoGrip * 2.2) * dt);
+  /* The bed is a real box.
+
+     The chassis hull is concave, and the bed void sits OUTSIDE that polygon,
+     so the tailgate and cab wall never actually collided with anything — the
+     crates were only ever held by a fudge force. These are the real walls,
+     in the truck own frame: a floor, a tailgate and the back of the cab.
+     Below the rail a crate is contained; above it, it can leave. */
+  G.containCargo = function (dt) {
+    var BED = this.truck.bed;
+    var ch = this.truck.chassis;
+    var c = ch.centroid(), a = ch.angle();
+    var ca = Math.cos(a), sa = Math.sin(a);
+    var damp = JC.clamp(0.3 + this.stats.cargoGrip * 0.45, 0, 0.8);
+    var lift = this.stats.cargoGrip * 14;             // a net raises the sides
+    var tv = this.truck.vel();
+
     for (var i = 0; i < this.truck.crates.length; i++) {
       var box = this.truck.crates[i];
+
+      // settle gently toward the slot so a loaded bed looks tidy
       var slot = this.truck.bedSlot(i);
-      var c = box.centroid();
-      var dx = slot.x - c.x, dy = slot.y - c.y;
-      if (Math.hypot(dx, dy) > 150) continue;         // already on its way out
+      var bc = box.centroid();
+      var sdx = slot.x - bc.x, sdy = slot.y - bc.y;
+      if (Math.hypot(sdx, sdy) < 60) {
+        var k = Math.min(0.4, 2.2 * dt);
+        for (var q = 0; q < box.pts.length; q++) {
+          box.pts[q].x += sdx * k; box.pts[q].y += sdy * k;
+        }
+      }
+
+      // a cargo net just stops things rattling
+      if (damp > 0) {
+        var bv = box.velocity();
+        for (var d = 0; d < box.pts.length; d++) {
+          box.pts[d].px += (bv.x - tv.x) * damp;
+          box.pts[d].py += (bv.y - tv.y) * damp;
+        }
+      }
+
       for (var p = 0; p < box.pts.length; p++) {
-        box.pts[p].x += dx * k;
-        box.pts[p].y += dy * k;
+        var pt = box.pts[p];
+        var dx = pt.x - c.x, dy = pt.y - c.y;
+        var lx = dx * ca + dy * sa;
+        var ly = -dx * sa + dy * ca;
+        var moved = false;
+
+        if (ly > BED.floor) { ly = BED.floor; moved = true; }
+        var railTop = BED.rail - lift;
+        if (ly > railTop) {                            // still down inside the bed
+          if (lx < BED.back)  { lx = BED.back;  moved = true; }
+          if (lx > BED.front) { lx = BED.front; moved = true; }
+        }
+        if (!moved) continue;
+
+        pt.x = c.x + lx * ca - ly * sa;
+        pt.y = c.y + lx * sa + ly * ca;
       }
     }
   };
 
   G.updateCargo = function (dt) {
-    this.settleCargo(dt);
+    this.containCargo(dt);
     var lost = this.truck.checkSpills();
     for (var i = 0; i < lost.length; i++) this.onSpill(lost[i]);
 
@@ -683,6 +729,23 @@ window.JC = window.JC || {};
     if (this.shieldTimer <= 0 && this.shield < this.stats.shieldMax) {
       this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * 6 * dt);
     }
+  };
+
+  /* You cannot reverse out of the world. Everything gets shoved back in. */
+  G.holdLeftEdge = function () {
+    var self = this;
+    function clampBody(b) {
+      for (var i = 0; i < b.pts.length; i++) {
+        var p = b.pts[i];
+        if (p.x >= self.minX) continue;
+        var pen = self.minX - p.x;
+        p.x = self.minX;
+        p.px = self.minX + Math.min(pen, 4);      // bounce off rather than stick
+      }
+    }
+    clampBody(this.truck.chassis);
+    this.truck.wheels.forEach(clampBody);
+    this.truck.crates.forEach(clampBody);
   };
 
   /* Falling into a chasm is survivable, but it costs. */
@@ -883,6 +946,7 @@ window.JC = window.JC || {};
     R.drawTerrain(this.terrain);
     R.drawHazards(this.hazards);
     R.drawDecor(this.terrain, false);
+    R.drawWall(this.minX, this.terrain.heightAt(this.minX));
     if (this.atStop || Math.abs(this.truck.pos().x - this.stopX) < 1400) {
       var sx = this.stopX;
       R.drawStop(sx, this.terrain.heightAt(sx));

@@ -9,6 +9,7 @@ window.JC = window.JC || {};
   "use strict";
 
   var GRAV = 1750;
+  var MAX_STEP = 34;          // hard speed ceiling, px per substep
   var ITER = 6;               // constraint relaxation passes per step
 
   // ── points ────────────────────────────────────────────────────────────────
@@ -179,12 +180,18 @@ window.JC = window.JC || {};
 
   /* Gas pressure: push each hull edge along its outward normal by however
      much the body has been squashed below its rest area. */
+  var PRESS_SCALE = 0.05;     // pressure constant -> pixels
+  var PRESS_CAP = 1.2;        // most any one edge may move in one pass
+
   Body.prototype.solvePressure = function () {
     if (!this.pressure || !this.hull.length) return;
     var area = Math.abs(this.area());
     if (area < 1e-4) return;
-    var push = (this.restArea / area - 1) * this.pressure;
-    if (push <= 0) return;
+
+    // how far under rest area we are, capped so a hard squash cannot explode
+    var deficit = JC.clamp(this.restArea / area - 1, 0, 1.5);
+    if (deficit <= 0) return;
+    var push = deficit * this.pressure * PRESS_SCALE;
 
     for (var i = 0; i < this.hull.length; i++) {
       var p = this.pts[this.hull[i]];
@@ -193,10 +200,24 @@ window.JC = window.JC || {};
       var len = Math.hypot(dx, dy);
       if (len < 1e-6) continue;
       var nx = dy / len, ny = -dx / len;      // outward for CW winding
-      var f = push * len * 0.5;
+      var f = JC.clamp(push * len * 0.5, 0, PRESS_CAP);
       p.x += nx * f * p.inv; p.y += ny * f * p.inv;
       q.x += nx * f * q.inv; q.y += ny * f * q.inv;
     }
+  };
+
+  /* Average tangential speed of the rim — the bodys angular rate. */
+  Body.prototype.spinRate = function () {
+    var c = this.centroid(), sum = 0, n = 0;
+    for (var i = 0; i < this.pts.length; i++) {
+      var p = this.pts[i];
+      var dx = p.x - c.x, dy = p.y - c.y;
+      var d = Math.hypot(dx, dy);
+      if (d < 1e-6) continue;
+      sum += (p.vx() * -dy + p.vy() * dx) / d;
+      n++;
+    }
+    return n ? sum / n : 0;
   };
 
   /* Torque, used to drive the wheels: shove every point tangentially. */
@@ -279,6 +300,8 @@ window.JC = window.JC || {};
         p.ay += this.gravity;
         var vx = (p.x - p.px) * b.drag;
         var vy = (p.y - p.py) * b.drag;
+        var sp = Math.hypot(vx, vy);
+        if (sp > MAX_STEP) { vx = vx / sp * MAX_STEP; vy = vy / sp * MAX_STEP; }
         p.px = p.x; p.py = p.y;
         p.x += vx + p.ax * dt * dt;
         p.y += vy + p.ay * dt * dt;
@@ -353,8 +376,8 @@ window.JC = window.JC || {};
         b.bounds();
         if (a.max.x < b.min.x || b.max.x < a.min.x ||
             a.max.y < b.min.y || b.max.y < a.min.y) continue;
-        if (a.userData.noCollide && a.userData.noCollide === b.userData.group) continue;
-        if (b.userData.noCollide && b.userData.noCollide === a.userData.group) continue;
+        if (a.userData.group && a.userData.group === b.userData.group &&
+            (a.userData.noSelf || b.userData.noSelf)) continue;
         resolvePair(a, b);
         resolvePair(b, a);
       }

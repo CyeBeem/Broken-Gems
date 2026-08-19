@@ -93,6 +93,29 @@ window.JC = window.JC || {};
   }
   JC.blobPath = blobPath;
 
+  /* Straight edges with small rounded corners, tracking the live point
+     positions — keeps a truck looking like a truck while it squashes. */
+  function firmPath(ctx, pts, idx, r) {
+    var n = idx.length;
+    function along(from, to) {
+      var dx = to.x - from.x, dy = to.y - from.y;
+      var d = Math.hypot(dx, dy) || 1;
+      var k = Math.min(r, d * 0.42) / d;
+      return { x: from.x + dx * k, y: from.y + dy * k };
+    }
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var cur = pts[idx[i]];
+      var prev = pts[idx[(i - 1 + n) % n]];
+      var next = pts[idx[(i + 1) % n]];
+      var a = along(cur, prev), b = along(cur, next);
+      if (i === 0) ctx.moveTo(a.x, a.y); else ctx.lineTo(a.x, a.y);
+      ctx.quadraticCurveTo(cur.x, cur.y, b.x, b.y);
+    }
+    ctx.closePath();
+  }
+  JC.firmPath = firmPath;
+
   function fillBlob(ctx, body, fill, lw) {
     blobPath(ctx, body.pts, body.hull.length ? body.hull : body.pts.map(function (_, i) { return i; }));
     ctx.fillStyle = fill || body.color;
@@ -268,11 +291,11 @@ window.JC = window.JC || {};
     ctx.lineCap = "round";
     ctx.stroke();
 
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 4;
     ctx.strokeStyle = INK;
     ctx.beginPath();
-    ctx.moveTo(run[0].x, run[0].y - 10);
-    for (var k = 1; k < run.length; k++) ctx.lineTo(run[k].x, run[k].y - 10);
+    ctx.moveTo(run[0].x, run[0].y - 11);
+    for (var k = 1; k < run.length; k++) ctx.lineTo(run[k].x, run[k].y - 11);
     ctx.stroke();
   };
 
@@ -285,7 +308,7 @@ window.JC = window.JC || {};
       if (d.x < x0 || d.x > x1) continue;
       if (!!d.back !== !!back) continue;
       var gy = terrain.heightAt(d.x);
-      if (gy > 90000) gy = this.cam.y + 200;
+      if (gy > 90000) continue;               // nothing to stand on
       this.drawProp(d, gy);
     }
   };
@@ -375,6 +398,19 @@ window.JC = window.JC || {};
         ctx.beginPath(); ctx.arc(-5 * s, -16 * s, 3.5 * s, 0, 6.283);
         ctx.arc(5 * s, -16 * s, 3.5 * s, 0, 6.283); ctx.fill();
         break;
+      case "hoop":
+        ctx.strokeStyle = "#E8574F";
+        ctx.lineWidth = 11;
+        ctx.beginPath();
+        ctx.arc(0, 0, d.h * 0.55, Math.PI, 0);
+        ctx.stroke();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, d.h * 0.55 + 5.5, Math.PI, 0);
+        ctx.arc(0, 0, d.h * 0.55 - 5.5, 0, Math.PI, true);
+        ctx.stroke();
+        break;
       case "cone":
         ctx.fillStyle = "#FF7A3C";
         ctx.beginPath();
@@ -413,7 +449,7 @@ window.JC = window.JC || {};
         ctx.restore();
         break;
       case "building":
-        ctx.fillStyle = d.back ? JC.shade(d.c, -0.25) : d.c;
+        ctx.fillStyle = d.far ? JC.shade(d.c, -0.3) : d.c;
         ctx.fillRect(0, -d.h, d.w, d.h);
         ctx.strokeRect(0, -d.h, d.w, d.h);
         ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -461,6 +497,11 @@ window.JC = window.JC || {};
         ctx.fillRect(0, 6, d.w, 900);
         break;
       case "cablecar":
+        ctx.strokeStyle = "#6E6250"; ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(-260, 0); ctx.lineTo(-260, -320);
+        ctx.moveTo(260, 0); ctx.lineTo(260, -260);
+        ctx.stroke();
         ctx.strokeStyle = INK; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(-260, -320); ctx.lineTo(260, -260); ctx.stroke();
         var t = (performance.now() / 5000) % 1;
@@ -487,7 +528,16 @@ window.JC = window.JC || {};
       if (b.max.x < this.viewLeft() || b.min.x > this.viewRight()) continue;
 
       if (b.kind === "rope") { this.drawRope(b); continue; }
-      fillBlob(ctx, b, b.color, b.kind === "plank" ? 3 : 4);
+      if (b.kind === "cargo" || b.kind === "plank" || b.kind === "prop") {
+        firmPath(ctx, b.pts, b.hull, b.kind === "plank" ? 3 : 5);
+        ctx.fillStyle = b.color;
+        ctx.fill();
+        ctx.lineWidth = b.kind === "plank" ? 3 : 4;
+        ctx.strokeStyle = INK; ctx.lineJoin = "round";
+        ctx.stroke();
+      } else {
+        fillBlob(ctx, b, b.color, 4);
+      }
 
       if (b.kind === "cargo") {
         var c = b.centroid();
@@ -540,9 +590,28 @@ window.JC = window.JC || {};
       ctx.restore();
     }
 
-    // body
-    var flash = G && G.hurtFlash > 0;
-    fillBlob(ctx, ch, flash ? "#FFFFFF" : ch.color, 5);
+    /* Squash along the truck own axes, around its centre. Everything drawn
+       inside this transform — hull, window, stripe — stays consistent. */
+    var cc = ch.centroid(), ca = ch.angle();
+    var sq = truck.squash || 0, stz = truck.stretch || 0;
+    var sy = 1 - sq + stz, sx2 = 1 + sq * 0.55 - stz * 0.35;
+    ctx.save();
+    ctx.translate(cc.x, cc.y);
+    ctx.rotate(ca); ctx.scale(sx2, sy); ctx.rotate(-ca);
+    ctx.translate(-cc.x, -cc.y);
+
+    // body — firm silhouette, but every point is the live squashed one
+    firmPath(ctx, ch.pts, ch.hull, 9);
+    ctx.fillStyle = (G && G.hurtFlash > 0) ? "#FFFFFF" : ch.color;
+    ctx.fill();
+    ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+    ctx.stroke();
+    // a lighter band along the top sells the squash
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = JC.rgba("#FFFFFF", 0.16);
+    ctx.fillRect(ch.min.x, ch.min.y, ch.max.x - ch.min.x, (ch.max.y - ch.min.y) * 0.42);
+    ctx.restore();
 
     // cab window, positioned from the actual (squashed) hull points
     var p4 = ch.pts[4], p5 = ch.pts[5], p6 = ch.pts[6];
@@ -563,9 +632,18 @@ window.JC = window.JC || {};
     ctx.lineWidth = 5;
     ctx.strokeStyle = JC.shade(ch.color, -0.28);
     ctx.stroke();
+    ctx.restore();
 
-    // turret
-    var m = truck.turretMount();
+    // turret — squashed by hand so it rides the deformed roof
+    function squashPt(p) {
+      var dx = p.x - cc.x, dy = p.y - cc.y;
+      var co = Math.cos(-ca), si = Math.sin(-ca);
+      var lx = dx * co - dy * si, ly = dx * si + dy * co;
+      lx *= sx2; ly *= sy;
+      var co2 = Math.cos(ca), si2 = Math.sin(ca);
+      return { x: cc.x + lx * co2 - ly * si2, y: cc.y + lx * si2 + ly * co2 };
+    }
+    var m = squashPt(truck.turretMount());
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.fillStyle = "#5A5566";
@@ -843,6 +921,35 @@ window.JC = window.JC || {};
       ctx.fillStyle = "#6E6A7A";
       JC.rr(ctx, 4, -4, 24, 8, 4); ctx.fill(); ctx.stroke();
       ctx.restore();
+    }
+  };
+
+  /* A rock face at the start line. Without it the ground to the left is
+     solid but invisible, so reversing looks like driving on nothing. */
+  R.drawWall = function (x, gy) {
+    var ctx = this.ctx;
+    if (x < this.viewLeft() - 200) return;
+    var top = gy - 420;
+    ctx.fillStyle = "#7A6250";
+    ctx.beginPath();
+    ctx.moveTo(x, gy + 900);
+    ctx.lineTo(x, top);
+    for (var y = top; y < gy + 900; y += 60) {
+      ctx.lineTo(x - 46 - Math.sin(y * 0.03) * 20, y + 30);
+      ctx.lineTo(x - 92, y + 60);
+    }
+    ctx.lineTo(x - 400, gy + 900);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x, gy + 900); ctx.lineTo(x, top);
+    ctx.stroke();
+    ctx.fillStyle = "#5E4A3C";
+    for (var b = 0; b < 5; b++) {
+      ctx.beginPath();
+      ctx.arc(x - 24 - (b % 2) * 22, gy - 40 - b * 74, 15, 0, 6.283);
+      ctx.fill();
     }
   };
 

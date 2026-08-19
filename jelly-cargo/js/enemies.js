@@ -231,7 +231,7 @@ window.JC = window.JC || {};
 
     // stick to the ground, hopping over small stuff
     if (gy < 90000) {
-      var target = gy - this.r;
+      var target = gy - this.r * 0.82;
       if (this.y > target - 2) { this.y = target; this.vy = 0; }
       else { this.vy += 1750 * dt; this.y += this.vy * dt; }
     } else {

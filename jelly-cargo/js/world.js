@@ -249,8 +249,9 @@ window.JC = window.JC || {};
     for (var d = 0; d < Math.floor(n / 7); d++) {
       decor.push({ t: "rock", x: r.range(0, n * STEP), s: r.range(0.9, 2.0) });
     }
-    decor.push({ t: "peak", x: n * STEP * peak, s: r.range(1.2, 2.0) });
-    if (r.chance(0.6)) decor.push({ t: "cablecar", x: r.range(300, n * STEP - 300), s: 1 });
+    decor.push({ t: "peak", x: n * STEP * peak, s: r.range(1.2, 2.0), back: true });
+    decor.push({ t: "peak", x: n * STEP * peak - 420, s: r.range(0.8, 1.3), back: true });
+    if (r.chance(0.6)) decor.push({ t: "cablecar", x: r.range(300, n * STEP - 300), s: 1, back: true });
     addCrates.call(this, specs, n, 0.5);
     return { hs: hs, decor: decor, specs: specs };
   };
@@ -273,10 +274,10 @@ window.JC = window.JC || {};
     for (var k2 = gapEnd; k2 <= gapEnd + 4 && k2 < n; k2++) hs[k2] = lip;
 
     specs.push({ t: "bridge", x: gapStart * STEP, x2: gapEnd * STEP, y: lip });
-    decor.push({ t: "canyonwall", x: gapStart * STEP, w: gapLen * STEP, y: lip });
+    decor.push({ t: "canyonwall", x: gapStart * STEP, w: gapLen * STEP, y: lip, back: true });
 
     for (var d = 0; d < Math.floor(n / 9); d++) {
-      decor.push({ t: "mesa", x: r.range(0, n * STEP), s: r.range(0.8, 1.8) });
+      decor.push({ t: "mesa", x: r.range(0, n * STEP), s: r.range(0.8, 1.8), back: true });
     }
     addCrates.call(this, specs, n, 0.6);
     return { hs: hs, gaps: gaps, decor: decor, specs: specs };
@@ -315,7 +316,8 @@ window.JC = window.JC || {};
     var bx = 40;
     while (bx < n * STEP - 120) {
       decor.push({ t: "building", x: bx, w: r.range(90, 180), h: r.range(180, 520),
-                   c: r.pick(["#E8C46A", "#E88A6A", "#8AB4E8", "#C8A0E8", "#7FD4C0"]), back: r.chance(0.5) });
+                   c: r.pick(["#E8C46A", "#E88A6A", "#8AB4E8", "#C8A0E8", "#7FD4C0"]),
+                   back: true, far: r.chance(0.5) });
       bx += r.range(120, 240);
     }
     for (var s = 0; s < Math.floor(n / 12); s++) {
@@ -375,7 +377,7 @@ window.JC = window.JC || {};
       if (pick === 0) specs.push({ t: "ramp", x: x, w: r.range(120, 200), h: r.range(80, 150) });
       else if (pick === 1) specs.push({ t: "seesaw", x: x, w: r.range(180, 260) });
       else if (pick === 2) specs.push({ t: "boulders", x: x, n: r.int(2, 4) });
-      else specs.push({ t: "hoop", x: x, h: r.range(120, 190) });
+      else decor.push({ t: "hoop", x: x, h: r.range(120, 190) });
       decor.push({ t: "cone", x: x - 40, s: 1 });
       decor.push({ t: "cone", x: x + 40, s: 1 });
       x += r.range(300, 480);
@@ -458,9 +460,17 @@ window.JC = window.JC || {};
     } else if (s.t === "bridge") {
       out = out.concat(this.buildBridge(s));
 
-    } else if (s.t === "ramp" || s.t === "hoop") {
-      // these are drawn and collided as static terrain-like props
-      return null;
+    } else if (s.t === "ramp") {
+      var rb = new JC.Body({ match: 1, friction: 0.8, color: "#D98A3C", kind: "prop" });
+      var rw = s.w || 150, rh = s.h || 100;
+      rb.add(s.x - rw / 2, gy + 4, 0);
+      rb.add(s.x + rw / 2, gy - rh, 0);
+      rb.add(s.x + rw / 2, gy + 4, 0);
+      rb.hull = [0, 1, 2];
+      for (var q = 0; q < rb.pts.length; q++) { rb.pts[q].m = 0; rb.pts[q].inv = 0; }
+      rb.bake();
+      rb.userData.group = "prop";
+      out.push(w.add(rb));
     }
     return out.length ? out : null;
   };
@@ -484,6 +494,7 @@ window.JC = window.JC || {};
     }
     deck.friction = 0.85;
     deck.userData.group = "bridge";
+    deck.userData.noSelf = true;
     out.push(w.add(deck));
 
     // planks ride the deck rope, giving the truck something solid underfoot
@@ -493,6 +504,7 @@ window.JC = window.JC || {};
                              span / segs * 0.94, 11,
                              { match: 0.9, color: "#9A6438", kind: "plank", friction: 0.85 });
       plank.userData.group = "bridge";
+      plank.userData.noSelf = true;
       plank.userData.rope = { body: deck, i: k };
       w.add(plank);
       out.push(plank);
@@ -503,6 +515,7 @@ window.JC = window.JC || {};
     var rail = JC.makeRope(x1, railY, x2, railY, Math.max(5, Math.round(segs / 2)),
                            { color: "#6B4020", mass: 0.6 });
     rail.userData.group = "bridge";
+    rail.userData.noSelf = true;
     rail.userData.decor = true;
     out.push(w.add(rail));
 
