@@ -330,7 +330,10 @@ window.JC = window.JC || {};
     }
     // a couple of ramps through town
     var ramps = r.int(1, 3);
-    for (var q = 0; q < ramps; q++) specs.push({ t: "ramp", x: r.range(200, n * STEP - 200), w: r.range(110, 190), h: r.range(60, 130) });
+    for (var q = 0; q < ramps; q++) {
+      carveRamp(hs, n, Math.floor(r.range(200, n * STEP - 600) / STEP),
+                r.int(14, 19), r.range(38, 60), decor);
+    }
     addCrates.call(this, specs, n, 0.9);
     return { hs: hs, decor: decor, specs: specs };
   };
@@ -384,20 +387,37 @@ window.JC = window.JC || {};
       hs.push(startY + (this.n2(i * 0.015) - 0.5) * 40 * (1 - settle));
     }
     // a run of deliberate obstacles, spaced so momentum carries you through
-    var x = 220;
+    var x = 320;
     while (x < n * STEP - 260) {
       var pick = r.int(0, 3);
-      if (pick === 0) specs.push({ t: "ramp", x: x, w: r.range(120, 200), h: r.range(80, 150) });
+      if (pick === 0) carveRamp(hs, n, Math.floor(x / STEP), r.int(14, 20), r.range(40, 68), decor);
       else if (pick === 1) specs.push({ t: "seesaw", x: x, w: r.range(180, 260) });
       else if (pick === 2) specs.push({ t: "boulders", x: x, n: r.int(2, 4) });
       else decor.push({ t: "hoop", x: x, h: r.range(120, 190) });
       decor.push({ t: "cone", x: x - 40, s: 1 });
       decor.push({ t: "cone", x: x + 40, s: 1 });
-      x += r.range(300, 480);
+      x += r.range(620, 900);
     }
     addCrates.call(this, specs, n, 1.0);
     return { hs: hs, decor: decor, specs: specs };
   };
+
+  /* A ramp shaped into the heightfield: a steady rise, then a short lip so
+     you get a launch off the end. The slope clamp trims anything too steep to
+     climb, so this can never become an impassable wall. */
+  function carveRamp(hs, n, at, len, height, decor) {
+    if (at < 2 || at + len + 6 >= n) return;
+    for (var i = 0; i < len; i++) {
+      hs[at + i] -= (i / len) * height;
+    }
+    for (var k = 0; k < 5 && at + len + k < n; k++) {
+      hs[at + len + k] -= height * (1 - k / 5);       // the kicker
+    }
+    if (decor) {
+      decor.push({ t: "cone", x: (at - 1) * STEP, s: 1 });
+      decor.push({ t: "cone", x: (at + len + 5) * STEP, s: 1 });
+    }
+  }
 
   /* Scatter loose crates you can bump into and knock about. */
   function addCrates(specs, n, chance) {
@@ -473,17 +493,6 @@ window.JC = window.JC || {};
     } else if (s.t === "bridge") {
       out = out.concat(this.buildBridge(s));
 
-    } else if (s.t === "ramp") {
-      var rb = new JC.Body({ match: 1, friction: 0.8, color: "#D98A3C", kind: "prop" });
-      var rw = s.w || 150, rh = s.h || 100;
-      rb.add(s.x - rw / 2, gy + 4, 0);
-      rb.add(s.x + rw / 2, gy - rh, 0);
-      rb.add(s.x + rw / 2, gy + 4, 0);
-      rb.hull = [0, 1, 2];
-      for (var q = 0; q < rb.pts.length; q++) { rb.pts[q].m = 0; rb.pts[q].inv = 0; }
-      rb.bake();
-      rb.userData.group = "prop";
-      out.push(w.add(rb));
     }
     return out.length ? out : null;
   };

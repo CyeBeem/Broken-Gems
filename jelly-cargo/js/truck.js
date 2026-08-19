@@ -125,7 +125,7 @@ window.JC = window.JC || {};
   T.drive = function (dt, throttle, lean, stats) {
     var torque = (stats.torque || 1);
     var grip = (stats.grip || 1);
-    var maxSpd = (stats.maxSpeed || 1) * 1.45;
+    var maxSpd = (stats.maxSpeed || 1) * 1.35;
 
     var v = this.chassis.velocity();
     var speed = v.x;
@@ -136,7 +136,7 @@ window.JC = window.JC || {};
       var t = over ? 0 : throttle;
       // grounded wheels bite, airborne ones just spin up
       var bite = wheel.grounded ? 1 : 0.22;
-      wheel.spin += t * torque * 0.165 * bite * grip;
+      wheel.spin += t * torque * 0.42 * bite * grip;
       this.wheelSpin[i] = JC.lerp(this.wheelSpin[i], t * 9, 0.25);
     }
 
@@ -149,9 +149,17 @@ window.JC = window.JC || {};
 
     var onGround = this.wheels[0].grounded || this.wheels[1].grounded;
 
-    // leaning: gentle with the wheels down, full authority once airborne
     if (lean) {
-      this.torque(((onGround ? 5 : 26)) * lean * dt);
+      if (onGround) {
+        this.torque(5 * lean * dt);
+      } else {
+        // air control is a drift, not a spin
+        var drift = 1.9 * lean * dt * (1 + (stats.airControl || 0));
+        this.chassis.impulse(drift, 0);
+        for (var dw = 0; dw < this.wheels.length; dw++) {
+          this.wheels[dw].impulse(drift, 0);
+        }
+      }
     }
 
     /* With wheels on the ground the chassis wants to sit level with the slope.
@@ -167,10 +175,8 @@ window.JC = window.JC || {};
     // airborne tracking, for the flip-recovery feel
     if (!this.chassis.grounded && !this.wheels[0].grounded && !this.wheels[1].grounded) {
       this.airTime += dt;
-      if (!lean) {                                  // no input: settle level
-        var lv = JC.angDiff(this.chassis.angle(), 0);
-        this.torque(JC.clamp(lv, -1, 1) * 34 * dt);
-      }
+      var lv = JC.angDiff(this.chassis.angle(), 0);
+      this.torque(JC.clamp(lv, -1, 1) * 58 * dt);
     } else {
       this.airTime = 0;
     }
@@ -292,9 +298,9 @@ window.JC = window.JC || {};
     for (var i = this.crates.length - 1; i >= 0; i--) {
       var box = this.crates[i];
       var b = box.centroid();
-      var far = JC.dist(b.x, b.y, c.x, c.y) > 210;
-      var behind = (b.x - c.x) < -140;
-      var below = b.y - c.y > 110;
+      var far = JC.dist(b.x, b.y, c.x, c.y) > 260;
+      var behind = (b.x - c.x) < -175;
+      var below = b.y - c.y > 140;
       if (far || behind || below) {
         lost.push(box.userData.cargo);
         this.crates.splice(i, 1);
@@ -318,6 +324,9 @@ window.JC = window.JC || {};
   // ── damage feedback ───────────────────────────────────────────────────────
   T.shove = function (ix, iy) {
     this.chassis.impulse(-ix, -iy);
+    for (var i = 0; i < this.wheels.length; i++) {
+      this.wheels[i].impulse(-ix, -iy);
+    }
   };
 
   T.isUpsideDown = function () {

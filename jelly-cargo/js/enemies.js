@@ -294,7 +294,7 @@ window.JC = window.JC || {};
 
     // shove the truck around
     var dir = JC.sign(tp.x - this.x) || 1;
-    G.truck.shove(dir * (this.def.big ? 7 : 3.4), -2.2);
+    G.truck.shove(dir * (this.def.big ? 3.0 : 1.5), -0.8);
     G.fx.burst(this.x, this.y, "#FFD24F", 10);
     G.shake(this.def.big ? 10 : 5);
 

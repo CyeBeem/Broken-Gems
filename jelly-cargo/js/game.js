@@ -691,7 +691,7 @@ window.JC = window.JC || {};
     var ch = this.truck.chassis;
     var c = ch.centroid(), a = ch.angle();
     var ca = Math.cos(a), sa = Math.sin(a);
-    var damp = JC.clamp(0.05 + this.stats.cargoGrip * 0.45, 0, 0.75);
+    var damp = JC.clamp(0.22 + this.stats.cargoGrip * 0.45, 0, 0.8);
     var lift = this.stats.cargoGrip * 14;             // a net raises the sides
     var tv = this.truck.vel();
 
@@ -702,7 +702,7 @@ window.JC = window.JC || {};
          ground sits well under this; a real slam goes well over. */
       var bvel = box.velocity();
       var fast = Math.hypot(bvel.x - tv.x, bvel.y - tv.y) >
-                 2.0 * (1 + this.stats.cargoGrip * 1.7);
+                 3.2 * (1 + this.stats.cargoGrip * 1.9);
 
       /* A crate thrown this hard is on its way out. Let go of it completely
          apart from the floor — no settling, no damping, no side rails — or it
