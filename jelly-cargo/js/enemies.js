@@ -151,7 +151,7 @@ window.JC = window.JC || {};
     G.fx.burst(this.x, this.y, this.def.color, this.def.big ? 26 : 14);
     G.gold += Math.round(this.gold * G.stats.goldMul);
     G.kills++;
-    G.abilities.fire("onKill", G, this, src);
+    G.abilities.fire("onKill", G, this);
   };
 
   E.update = function (dt, G) {
@@ -337,6 +337,10 @@ window.JC = window.JC || {};
     if (this.timer > 0) return;
 
     var th = this.threat(G);
+
+    // hard ceiling on how many can be chasing you at once
+    var cap = JC.clamp(9 + Math.floor(th / 45), 9, 24);
+    if (G.enemies.length >= cap) { this.timer = 1.4; return; }
     var pool = this.available(G);
     var self = this;
     var count = JC.clamp(1 + Math.floor(th / 70), 1, 7);
@@ -346,6 +350,7 @@ window.JC = window.JC || {};
     this.timer = JC.clamp(9.5 - th / 60, 2.4, 9.5) * this.rng.range(0.8, 1.2);
     this.wave++;
 
+    count = Math.min(count, cap - G.enemies.length);
     for (var i = 0; i < count; i++) {
       var type = this.rng.sample(pool, 1, function (t) {
         var d = JC.ENEMIES[t];

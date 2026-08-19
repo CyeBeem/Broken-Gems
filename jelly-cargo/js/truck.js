@@ -199,7 +199,7 @@ window.JC = window.JC || {};
     if (!(this.wheels[0].grounded || this.wheels[1].grounded || this.chassis.grounded)) {
       return false;
     }
-    this.hopCool = 0.6;
+    this.hopCool = 1.2;
 
     // straight up in the truck own frame, so it hops off a slope sensibly
     var a = this.chassis.angle();

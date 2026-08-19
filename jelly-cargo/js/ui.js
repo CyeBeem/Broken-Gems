@@ -30,9 +30,10 @@ window.JC = window.JC || {};
     var barWrap = el("div", "prog-wrap");
     this.progFill = el("div", "prog-fill");
     barWrap.appendChild(this.progFill);
-    for (var i = 1; i <= 4; i++) {
+    var pulls = JC.pullsPerLeg();
+    for (var i = 1; i < pulls; i++) {
       var tick = el("div", "prog-tick");
-      tick.style.left = (i * 25) + "%";
+      tick.style.left = (i * (100 / pulls)) + "%";
       barWrap.appendChild(tick);
     }
     this.stopIcon = el("div", "prog-stop", "⛽");

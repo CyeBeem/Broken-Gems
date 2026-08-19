@@ -10,6 +10,7 @@ window.JC = window.JC || {};
   var LEG_CAP = 150000;
 
   var BASE_FIRE = 0.75;          // seconds between shots before modifiers
+  var PULLS_PER_LEG = 8;         // card draws spaced across each leg
 
   function baseStats() {
     return {
@@ -31,6 +32,8 @@ window.JC = window.JC || {};
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  JC.pullsPerLeg = function () { return PULLS_PER_LEG; };
+
   JC.Game = function (canvas, ui, seed) {
     this.canvas = canvas;
     this.ui = ui;
@@ -398,6 +401,9 @@ window.JC = window.JC || {};
     var tp = this.truck.pos();
     this.terrain.ensure(tp.x + 2400);
     this.structures.update(tp.x);
+
+    this.pruneT = (this.pruneT || 0) + dt;
+    if (this.pruneT > 5) { this.pruneT = 0; this.terrain.prune(tp.x - 3000); }
 
     this.updateTurret(dt);
     this.updateBullets(dt);
@@ -854,8 +860,8 @@ window.JC = window.JC || {};
 
     if (this.atStop) return;
     var p = this.legProgress();
-    var wantPulls = Math.floor(p * 4);
-    if (wantPulls > this.pullsThisLeg && this.pullsThisLeg < 4) {
+    var wantPulls = Math.floor(p * PULLS_PER_LEG);
+    if (wantPulls > this.pullsThisLeg && this.pullsThisLeg < PULLS_PER_LEG) {
       this.pullsThisLeg++;
       this.pullCount++;
       this.offerCards();

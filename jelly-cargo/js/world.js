@@ -87,6 +87,17 @@ window.JC = window.JC || {};
     return this.bands[0];
   };
 
+  /* Drop scenery that is far behind, so a long run does not keep paying to
+     scan it every frame. Called with the camera position. */
+  T.prune = function (behindX) {
+    if (this.decor.length < 400) return;
+    var keep = [];
+    for (var i = 0; i < this.decor.length; i++) {
+      if (this.decor[i].x > behindX) keep.push(this.decor[i]);
+    }
+    this.decor = keep;
+  };
+
   /* Generate ahead of the camera. */
   T.ensure = function (x) {
     while (this.endX() < x + 3200) {
@@ -299,8 +310,8 @@ window.JC = window.JC || {};
     for (var q = 0; q < lakeLen && lakeAt + q < n; q++) {
       hs[lakeAt + q] += Math.sin((q / lakeLen) * Math.PI) * deep;
     }
-    decor.push({ t: "waterfall", x: (dropAt - 6) * STEP, back: true,
-                 h: r.range(240, 380), w: r.range(46, 74) });
+    decor.push({ t: "waterfall", x: (dropAt - 10) * STEP, back: true,
+                 h: r.range(300, 430), w: r.range(26, 40) });
     decor.push({ t: "lake", x: (lakeAt + lakeLen / 2) * STEP,
                  w: lakeLen * STEP, deep: deep });
     for (var d = 0; d < Math.floor(n / 8); d++) {

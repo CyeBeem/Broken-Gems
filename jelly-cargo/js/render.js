@@ -549,41 +549,83 @@ window.JC = window.JC || {};
       }
       case "waterfall": {
         var fh = d.h, fw = d.w;
-        // the cliff it comes off, hazy like the other distant rock
-        ctx.fillStyle = "rgba(140,158,168,0.55)";
+        var MW = fw * 4.2;                       // mountain half-width
+
+        // the mountain, with a broken ridge like the other distant peaks
+        ctx.fillStyle = "rgba(158,180,196,0.55)";
         ctx.beginPath();
-        ctx.moveTo(-fw * 2.6, 20);
-        ctx.lineTo(-fw * 2.1, -fh * 1.05);
-        ctx.lineTo(fw * 2.3, -fh * 0.95);
-        ctx.lineTo(fw * 2.8, 20);
+        ctx.moveTo(-MW, 30);
+        ctx.lineTo(-MW * 0.58, -fh * 0.60);
+        ctx.lineTo(-MW * 0.30, -fh * 0.88);
+        ctx.lineTo(-fw * 0.75, -fh);
+        ctx.lineTo(fw * 0.75, -fh * 0.99);
+        ctx.lineTo(MW * 0.34, -fh * 0.84);
+        ctx.lineTo(MW * 0.62, -fh * 0.55);
+        ctx.lineTo(MW, 30);
         ctx.closePath(); ctx.fill();
 
-        // the fall itself
-        ctx.fillStyle = "rgba(178,226,250,0.85)";
+        // snow on the two shoulders
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
         ctx.beginPath();
-        ctx.moveTo(-fw / 2, -fh);
-        ctx.lineTo(fw / 2, -fh);
-        ctx.lineTo(fw * 0.72, 6);
-        ctx.lineTo(-fw * 0.72, 6);
+        ctx.moveTo(-MW * 0.30, -fh * 0.88);
+        ctx.lineTo(-fw * 0.75, -fh);
+        ctx.lineTo(-fw * 0.80, -fh * 0.88);
+        ctx.lineTo(-MW * 0.36, -fh * 0.78);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(MW * 0.34, -fh * 0.84);
+        ctx.lineTo(fw * 0.75, -fh * 0.99);
+        ctx.lineTo(fw * 0.80, -fh * 0.87);
+        ctx.lineTo(MW * 0.40, -fh * 0.74);
         ctx.closePath(); ctx.fill();
 
-        ctx.strokeStyle = "rgba(255,255,255,0.75)";
-        ctx.lineWidth = 3;
-        for (var st = 0; st < 5; st++) {
-          var sxp = -fw * 0.38 + st * (fw * 0.19);
-          var off = (performance.now() / 6 + st * 47) % fh;
+        // the gorge the water has cut, darker than the rock around it
+        ctx.fillStyle = "rgba(96,118,134,0.45)";
+        ctx.beginPath();
+        ctx.moveTo(-fw * 0.78, -fh * 0.97);
+        ctx.lineTo(fw * 0.78, -fh * 0.97);
+        ctx.lineTo(fw * 1.15, 24);
+        ctx.lineTo(-fw * 1.15, 24);
+        ctx.closePath(); ctx.fill();
+
+        // the fall: narrow at the lip, spreading as it drops
+        ctx.fillStyle = "rgba(196,234,252,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(-fw * 0.30, -fh * 0.95);
+        ctx.lineTo(fw * 0.30, -fh * 0.95);
+        ctx.quadraticCurveTo(fw * 0.52, -fh * 0.4, fw * 0.62, 18);
+        ctx.lineTo(-fw * 0.62, 18);
+        ctx.quadraticCurveTo(-fw * 0.52, -fh * 0.4, -fw * 0.30, -fh * 0.95);
+        ctx.closePath(); ctx.fill();
+
+        // the lip it pours over
+        ctx.fillStyle = "rgba(232,248,255,0.9)";
+        ctx.beginPath();
+        ctx.ellipse(0, -fh * 0.95, fw * 0.34, fw * 0.10, 0, 0, 6.283);
+        ctx.fill();
+
+        // falling streaks, tracking the widening
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = 2.5;
+        for (var st = 0; st < 4; st++) {
+          var t0 = ((performance.now() / 900 + st * 0.27) % 1);
+          var yy = -fh * 0.95 + t0 * fh * 0.95;
+          var spread = 0.30 + t0 * 0.28;
+          var sxp = (st - 1.5) * fw * spread * 0.52;
           ctx.beginPath();
-          ctx.moveTo(sxp, -fh + off);
-          ctx.lineTo(sxp, -fh + off + fh * 0.22);
+          ctx.moveTo(sxp, yy);
+          ctx.lineTo(sxp, yy + fh * 0.16);
           ctx.stroke();
         }
 
-        // mist where it lands
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        for (var mi = 0; mi < 5; mi++) {
-          var mx = (mi - 2) * fw * 0.42;
-          var mr = fw * (0.34 + 0.1 * Math.sin(performance.now() / 700 + mi));
-          ctx.beginPath(); ctx.ellipse(mx, 6, mr, mr * 0.5, 0, 0, 6.283); ctx.fill();
+        // mist pooling at the base
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        for (var mi = 0; mi < 4; mi++) {
+          var mx = (mi - 1.5) * fw * 0.55;
+          var mr = fw * (0.36 + 0.09 * Math.sin(performance.now() / 700 + mi));
+          ctx.beginPath();
+          ctx.ellipse(mx, 20, mr, mr * 0.42, 0, 0, 6.283);
+          ctx.fill();
         }
         break;
       }
