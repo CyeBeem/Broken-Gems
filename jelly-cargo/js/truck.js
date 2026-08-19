@@ -7,20 +7,20 @@ window.JC = window.JC || {};
   /* Side profile, nose pointing right. The bed is a real notch in the hull,
      so crates sit inside it instead of being pushed out as intersections. */
   var HULL = [
-    [-85, -60],   // 0  tailgate top
-    [-74, -60],   // 1
-    [-74,   6],   // 2  bed floor, rear
-    [ -6,   6],   // 3  bed floor, front
-    [ -6, -64],   // 4  cab rear
-    [ 40, -64],   // 5  cab roof front
-    [ 68, -38],   // 6  windscreen base
-    [ 78,  22],   // 7  nose bottom
-    [ 10,  22],   // 8
-    [-85,  22]    // 9  rear bottom
+    [-92, -54],   // 0  tailgate, top outer
+    [-80, -54],   // 1  tailgate, top inner
+    [-80,   6],   // 2  bed floor, rear
+    [  6,   6],   // 3  bed floor, front
+    [  6, -78],   // 4  cab, rear roofline
+    [ 62, -78],   // 5  cab, front roofline
+    [ 72, -56],   // 6  above the grille
+    [ 78,  20],   // 7  nose, bottom
+    [ -6,  20],   // 8  under-body
+    [-92,  20]    // 9  rear bottom
   ];
 
   var WHEEL_R = 30;
-  var AXLES = [[-52, 32], [52, 32]];
+  var AXLES = [[-54, 32], [54, 32]];
 
   JC.Truck = function (world, x, y) {
     this.world = world;
@@ -36,19 +36,19 @@ window.JC = window.JC || {};
     this.lastVy = 0;
 
     // ── chassis ──
-    var ch = new JC.Body({ match: 0.10, friction: 0.35, color: "#E8453C", kind: "truck" });
+    var ch = new JC.Body({ match: 0.06, friction: 0.35, color: "#E8453C", kind: "truck" });
     var i;
     var NOSE = { 6: 1, 7: 1 };                 // engine bay, up front
     for (i = 0; i < HULL.length; i++) {
       ch.add(x + HULL[i][0], y + HULL[i][1], NOSE[i] ? 3.1 : 1.6);
       ch.hull.push(i);
     }
-    for (i = 0; i < HULL.length; i++) ch.link(i, (i + 1) % HULL.length, 0.45);
+    for (i = 0; i < HULL.length; i++) ch.link(i, (i + 1) % HULL.length, 0.30);
     // internal bracing, every non-adjacent pair at reduced stiffness
     for (i = 0; i < HULL.length; i++) {
       for (var j = i + 2; j < HULL.length; j++) {
         if (i === 0 && j === HULL.length - 1) continue;
-        ch.link(i, j, 0.14);
+        ch.link(i, j, 0.085);
       }
     }
     ch.bake();
@@ -62,7 +62,7 @@ window.JC = window.JC || {};
     for (var w = 0; w < 2; w++) {
       var wx = x + AXLES[w][0], wy = y + AXLES[w][1];
       var tyre = JC.makeWheel(wx, wy, WHEEL_R, 12, {
-        match: 0.10, pressure: 2.15, friction: 0.92, color: "#2E2A33", kind: "wheel"
+        match: 0.055, pressure: 2.6, friction: 0.92, color: "#2E2A33", kind: "wheel"
       });
       var hub = tyre.add(wx, wy, 2.2);          // axle at the centre
       for (var k = 0; k < 12; k++) tyre.link(k, 12, 0.55);
@@ -124,7 +124,7 @@ window.JC = window.JC || {};
   T.drive = function (dt, throttle, lean, stats) {
     var torque = (stats.torque || 1);
     var grip = (stats.grip || 1);
-    var maxSpd = (stats.maxSpeed || 1) * 15.5;
+    var maxSpd = (stats.maxSpeed || 1) * 2.28;
 
     var v = this.chassis.velocity();
     var speed = v.x;
@@ -135,7 +135,7 @@ window.JC = window.JC || {};
       var t = over ? 0 : throttle;
       // grounded wheels bite, airborne ones just spin up
       var bite = wheel.grounded ? 1 : 0.22;
-      wheel.spin += t * torque * 1.35 * bite * grip;
+      wheel.spin += t * torque * 0.30 * bite * grip;
       this.wheelSpin[i] = JC.lerp(this.wheelSpin[i], t * 9, 0.25);
     }
 
@@ -176,9 +176,9 @@ window.JC = window.JC || {};
     var dv = v.y - this.lastVy;
     this.lastVy = v.y;
     var impact = Math.max(0, -dv);                 // sudden stop = landing
-    var hit = Math.min(0.34, impact * 0.055);
+    var hit = Math.min(0.42, impact * 0.16);
     this.squash = Math.max(this.squash * Math.pow(0.0006, dt), hit);
-    this.stretch = JC.clamp(v.y * 0.016, -0.06, 0.22);
+    this.stretch = JC.clamp(v.y * 0.05, -0.08, 0.28);
   };
 
   /* Rotate the chassis about its centroid. */

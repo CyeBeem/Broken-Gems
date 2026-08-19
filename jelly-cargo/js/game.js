@@ -5,9 +5,9 @@ window.JC = window.JC || {};
 
   /* One leg of the journey, in world pixels. Bump this if you want longer
      hauls between cargo stops; four card draws are spaced across it. */
-  var LEG_BASE = 150000;
-  var LEG_GROW = 26000;
-  var LEG_CAP = 320000;
+  var LEG_BASE = 68000;
+  var LEG_GROW = 12000;
+  var LEG_CAP = 150000;
 
   var BASE_FIRE = 0.75;          // seconds between shots before modifiers
 
@@ -661,12 +661,34 @@ window.JC = window.JC || {};
     var ch = this.truck.chassis;
     var c = ch.centroid(), a = ch.angle();
     var ca = Math.cos(a), sa = Math.sin(a);
-    var damp = JC.clamp(0.3 + this.stats.cargoGrip * 0.45, 0, 0.8);
+    var damp = JC.clamp(0.05 + this.stats.cargoGrip * 0.45, 0, 0.75);
     var lift = this.stats.cargoGrip * 14;             // a net raises the sides
     var tv = this.truck.vel();
 
     for (var i = 0; i < this.truck.crates.length; i++) {
       var box = this.truck.crates[i];
+
+      /* How hard is this crate moving relative to the truck? Ordinary rough
+         ground sits well under this; a real slam goes well over. */
+      var bvel = box.velocity();
+      var fast = Math.hypot(bvel.x - tv.x, bvel.y - tv.y) >
+                 2.0 * (1 + this.stats.cargoGrip * 1.7);
+
+      /* A crate thrown this hard is on its way out. Let go of it completely
+         apart from the floor — no settling, no damping, no side rails — or it
+         just gets dragged back into its slot and nothing can ever spill. */
+      if (fast) {
+        for (var fp = 0; fp < box.pts.length; fp++) {
+          var fpt = box.pts[fp];
+          var fdx = fpt.x - c.x, fdy = fpt.y - c.y;
+          var fly = -fdx * sa + fdy * ca;
+          if (fly <= BED.floor) continue;
+          var flx = fdx * ca + fdy * sa;
+          fpt.x = c.x + flx * ca - BED.floor * sa;
+          fpt.y = c.y + flx * sa + BED.floor * ca;
+        }
+        continue;
+      }
 
       // settle gently toward the slot so a loaded bed looks tidy
       var slot = this.truck.bedSlot(i);
@@ -688,6 +710,9 @@ window.JC = window.JC || {};
         }
       }
 
+      var railTop = BED.rail - lift;
+      var hitFloor = false;
+
       for (var p = 0; p < box.pts.length; p++) {
         var pt = box.pts[p];
         var dx = pt.x - c.x, dy = pt.y - c.y;
@@ -695,9 +720,8 @@ window.JC = window.JC || {};
         var ly = -dx * sa + dy * ca;
         var moved = false;
 
-        if (ly > BED.floor) { ly = BED.floor; moved = true; }
-        var railTop = BED.rail - lift;
-        if (ly > railTop) {                            // still down inside the bed
+        if (ly > BED.floor) { ly = BED.floor; moved = true; hitFloor = true; }
+        if (ly > railTop && !fast) {                    // held only while settled
           if (lx < BED.back)  { lx = BED.back;  moved = true; }
           if (lx > BED.front) { lx = BED.front; moved = true; }
         }
@@ -705,6 +729,20 @@ window.JC = window.JC || {};
 
         pt.x = c.x + lx * ca - ly * sa;
         pt.y = c.y + lx * sa + ly * ca;
+      }
+
+      /* Restitution off the bed floor, along the truck own up axis. Without
+         this the clamp above absorbs every landing and nothing ever spills. */
+      if (hitFloor) {
+        var rel = box.velocity();
+        var down = (rel.y - tv.y) * ca - (rel.x - tv.x) * sa;   // local +y
+        if (down > 0.25) {
+          var kick = down * 0.62;
+          for (var k2 = 0; k2 < box.pts.length; k2++) {
+            box.pts[k2].px -= -sa * kick;
+            box.pts[k2].py -= ca * kick;
+          }
+        }
       }
     }
   };

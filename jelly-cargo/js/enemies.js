@@ -8,65 +8,65 @@ window.JC = window.JC || {};
   /* hp is in bullet-hits at base damage 1, so a plain goblin dies in three. */
   JC.ENEMIES = {
     runner: {
-      name: "Goblin", hp: 3, r: 17, spd: 200, dmg: 6, cargoDmg: 0, gold: 4,
+      name: "Goblin", hp: 2, r: 17, spd: 130, dmg: 6, cargoDmg: 0, gold: 4,
       threat: 0, weight: 10, air: false, color: "#7FBF4F",
       blurb: "Runs at you shrieking. Not complicated."
     },
     moto: {
-      name: "Moto Goblin", hp: 4, r: 20, spd: 330, dmg: 9, cargoDmg: 3, gold: 7,
+      name: "Moto Goblin", hp: 4, r: 20, spd: 210, dmg: 9, cargoDmg: 3, gold: 7,
       threat: 0, weight: 9, air: false, color: "#E86A3C",
       blurb: "Rides in fast, rams the tailgate, wheels away."
     },
     drone: {
-      name: "Drone Surfer", hp: 3, r: 18, spd: 175, dmg: 5, cargoDmg: 4, gold: 8,
+      name: "Drone Surfer", hp: 3, r: 18, spd: 120, dmg: 5, cargoDmg: 4, gold: 8,
       threat: 40, weight: 8, air: true, color: "#6FA8E8", shoots: 2.4,
       blurb: "Hovers overhead and plinks at your cargo."
     },
     slinger: {
-      name: "Rock Slinger", hp: 4, r: 17, spd: 130, dmg: 7, cargoDmg: 2, gold: 7,
+      name: "Rock Slinger", hp: 4, r: 17, spd: 90, dmg: 7, cargoDmg: 2, gold: 7,
       threat: 60, weight: 7, air: false, color: "#B8A05A", shoots: 2.9, standoff: 380,
       blurb: "Keeps its distance and lobs rocks at the bed."
     },
     sapper: {
-      name: "Sapper", hp: 5, r: 16, spd: 290, dmg: 2, cargoDmg: 9, gold: 10,
+      name: "Sapper", hp: 5, r: 16, spd: 185, dmg: 2, cargoDmg: 9, gold: 10,
       threat: 90, weight: 6, air: false, color: "#C86AD8", latch: true,
       blurb: "Latches onto the bed and starts throwing your crates out."
     },
     brute: {
-      name: "Brute", hp: 12, r: 28, spd: 150, dmg: 16, cargoDmg: 6, gold: 16,
+      name: "Brute", hp: 12, r: 28, spd: 100, dmg: 16, cargoDmg: 6, gold: 16,
       threat: 130, weight: 6, air: false, color: "#4F9E5F", knockRes: 0.55,
       blurb: "Big, green, and swings hard enough to shift the whole truck."
     },
     bomber: {
-      name: "Bomber", hp: 5, r: 22, spd: 230, dmg: 12, cargoDmg: 10, gold: 14,
+      name: "Bomber", hp: 5, r: 22, spd: 150, dmg: 12, cargoDmg: 10, gold: 14,
       threat: 170, weight: 6, air: true, color: "#D8544F", bombs: 2.6,
       blurb: "Flies over the bed and drops something unpleasant."
     },
     jetpack: {
-      name: "Jetpack Goblin", hp: 6, r: 18, spd: 300, dmg: 11, cargoDmg: 4, gold: 13,
+      name: "Jetpack Goblin", hp: 6, r: 18, spd: 195, dmg: 11, cargoDmg: 4, gold: 13,
       threat: 210, weight: 6, air: true, color: "#E8B03C", dives: true,
       blurb: "Hovers, picks a moment, then dives straight at the cab."
     },
     gtruck: {
-      name: "Goblin Truck", hp: 20, r: 38, spd: 265, dmg: 18, cargoDmg: 8, gold: 26,
+      name: "Goblin Truck", hp: 20, r: 38, spd: 170, dmg: 18, cargoDmg: 8, gold: 26,
       threat: 260, weight: 5, air: false, knockRes: 0.75, shoots: 1.9,
       color: "#8A6ED8", big: true,
       blurb: "Their answer to yours. Rams, and has a gun on the roof."
     },
     tank: {
-      name: "Goblin Tank", hp: 34, r: 42, spd: 120, dmg: 22, cargoDmg: 12, gold: 40,
+      name: "Goblin Tank", hp: 34, r: 42, spd: 80, dmg: 22, cargoDmg: 12, gold: 40,
       threat: 340, weight: 4, air: false, knockRes: 0.9, shoots: 2.2, shell: true,
       color: "#6E7A52", big: true,
       blurb: "Slow, armoured, and the shells arc right into your bed."
     },
     warlord: {
-      name: "Warlord", hp: 70, r: 46, spd: 210, dmg: 26, cargoDmg: 16, gold: 90,
+      name: "Warlord", hp: 70, r: 46, spd: 140, dmg: 26, cargoDmg: 16, gold: 90,
       threat: 460, weight: 2, air: false, knockRes: 0.95, shoots: 1.4, elite: true,
       color: "#D83C6A", big: true,
       blurb: "Wears a hubcap as a crown. Earned it."
     },
     zeppelin: {
-      name: "Goblin Zeppelin", hp: 90, r: 60, spd: 130, dmg: 20, cargoDmg: 20, gold: 120,
+      name: "Goblin Zeppelin", hp: 90, r: 60, spd: 85, dmg: 20, cargoDmg: 20, gold: 120,
       threat: 560, weight: 2, air: true, bombs: 1.3, elite: true, knockRes: 1,
       color: "#C8783C", big: true,
       blurb: "Drifts overhead raining barrels. Shoot it down."

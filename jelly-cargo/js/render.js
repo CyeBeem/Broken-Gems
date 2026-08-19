@@ -158,7 +158,7 @@ window.JC = window.JC || {};
   };
 
   R.follow = function (tx, ty, vx, dt) {
-    var lead = JC.clamp(vx * 22, -260, 320);
+    var lead = JC.clamp(vx * 64, -240, 300);
     this.cam.x = JC.lerp(this.cam.x, tx + lead, 1 - Math.pow(0.0015, dt));
     this.cam.y = JC.lerp(this.cam.y, ty - 40, 1 - Math.pow(0.004, dt));
     if (this.cam.shake > 0) this.cam.shake = Math.max(0, this.cam.shake - dt * 40);
@@ -309,6 +309,7 @@ window.JC = window.JC || {};
       if (!!d.back !== !!back) continue;
       var gy = terrain.heightAt(d.x);
       if (gy > 90000) continue;               // nothing to stand on
+      d._terrain = terrain;                   // some props trace the ground
       this.drawProp(d, gy);
     }
   };
@@ -323,15 +324,26 @@ window.JC = window.JC || {};
     ctx.lineJoin = "round";
 
     switch (d.t) {
-      case "tree":
-        trunk(ctx, 9 * s, 40 * s);
+      case "tree": {
+        trunk(ctx, 10 * s, 46 * s);
+        var R0 = 32 * s, lumps = 9, wob = d.x * 0.05;
         ctx.fillStyle = "#54B84F";
         ctx.beginPath();
-        ctx.arc(0, -62 * s, 34 * s, 0, 6.283);
-        ctx.arc(-22 * s, -46 * s, 24 * s, 0, 6.283);
-        ctx.arc(22 * s, -46 * s, 24 * s, 0, 6.283);
-        ctx.fill(); ctx.stroke();
+        for (var li = 0; li <= lumps; li++) {
+          var ang = Math.PI * 2 * (li / lumps) - Math.PI / 2;
+          var rr0 = R0 * (0.82 + 0.24 * Math.abs(Math.sin(li * 2.3 + wob)));
+          var px = Math.cos(ang) * rr0 * 1.15;
+          var py = -60 * s + Math.sin(ang) * rr0 * 0.84;
+          if (li === 0) ctx.moveTo(px, py);
+          else ctx.quadraticCurveTo(
+            Math.cos(ang - 0.33) * rr0 * 1.34,
+            -60 * s + Math.sin(ang - 0.33) * rr0 * 1.0, px, py);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.beginPath(); ctx.arc(-R0 * 0.3, -72 * s, R0 * 0.4, 0, 6.283); ctx.fill();
         break;
+      }
       case "pine":
         trunk(ctx, 8 * s, 30 * s);
         ctx.fillStyle = d.back ? "#3E9A48" : "#47A94F";
@@ -457,41 +469,82 @@ window.JC = window.JC || {};
           for (var wx = 14; wx < d.w - 20; wx += 38) ctx.fillRect(wx, wy, 20, 24);
         }
         break;
-      case "peak":
-        ctx.fillStyle = "#C6D8E6";
+      case "peak": {
+        var H = 300 * s, W = 190 * s;
+        ctx.fillStyle = "rgba(176,199,219,0.5)";
         ctx.beginPath();
-        ctx.moveTo(-180 * s, 0); ctx.lineTo(0, -300 * s); ctx.lineTo(180 * s, 0);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#FFFFFF";
+        ctx.moveTo(-W, 60); ctx.lineTo(-W * 0.22, -H * 0.72);
+        ctx.lineTo(0, -H); ctx.lineTo(W * 0.30, -H * 0.66);
+        ctx.lineTo(W, 60);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
         ctx.beginPath();
-        ctx.moveTo(-52 * s, -212 * s); ctx.lineTo(0, -300 * s); ctx.lineTo(52 * s, -212 * s);
+        ctx.moveTo(-W * 0.30, -H * 0.60); ctx.lineTo(-W * 0.22, -H * 0.72);
+        ctx.lineTo(0, -H); ctx.lineTo(W * 0.30, -H * 0.66);
+        ctx.lineTo(W * 0.18, -H * 0.56); ctx.lineTo(W * 0.04, -H * 0.70);
+        ctx.lineTo(-W * 0.12, -H * 0.56);
         ctx.closePath(); ctx.fill();
         break;
+      }
       case "mesa":
-        ctx.fillStyle = "#C87A48";
+        ctx.fillStyle = "rgba(200,122,72,0.55)";
         ctx.beginPath();
-        ctx.moveTo(-70 * s, 0); ctx.lineTo(-52 * s, -120 * s);
-        ctx.lineTo(52 * s, -120 * s); ctx.lineTo(70 * s, 0);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.moveTo(-70 * s, 40); ctx.lineTo(-52 * s, -120 * s);
+        ctx.lineTo(52 * s, -120 * s); ctx.lineTo(70 * s, 40);
+        ctx.closePath(); ctx.fill();
         break;
-      case "waterfall":
-        ctx.fillStyle = "rgba(120,205,245,0.9)";
-        ctx.fillRect(-d.w / 2, 0, d.w, d.h + 30);
-        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      case "waterfall": {
+        ctx.translate(-d.x, 0);                    // back into world space
+        var terr = d._terrain;
+        var wx0 = d.x - d.w * 0.45, wx1 = d.x + d.w * 1.5, ws = 7;
+        ctx.beginPath();
+        ctx.moveTo(wx0, terr.heightAt(wx0) - 3);
+        for (var wx = wx0; wx <= wx1; wx += ws) ctx.lineTo(wx, terr.heightAt(wx) - 3);
+        ctx.lineTo(wx1, terr.heightAt(wx1) + 200);
+        ctx.lineTo(wx0, terr.heightAt(wx0) + 200);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(120,205,245,0.8)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
         ctx.lineWidth = 3;
-        for (var s2 = 0; s2 < 5; s2++) {
-          var sx = -d.w / 2 + 12 + s2 * (d.w / 5);
-          var off = (performance.now() / 4 + s2 * 60) % (d.h + 30);
-          ctx.beginPath(); ctx.moveTo(sx, off - 40); ctx.lineTo(sx, off);
+        ctx.beginPath();
+        ctx.moveTo(wx0, terr.heightAt(wx0) - 3);
+        for (var wx2 = wx0; wx2 <= wx1; wx2 += ws) ctx.lineTo(wx2, terr.heightAt(wx2) - 3);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 2.5;
+        for (var st = 0; st < 8; st++) {
+          var sxp = d.x + st * 10 - 24;
+          var top = terr.heightAt(sxp);
+          var off = (performance.now() / 7 + st * 34) % 80;
+          ctx.beginPath();
+          ctx.moveTo(sxp, top + off); ctx.lineTo(sxp, top + off + 30);
           ctx.stroke();
         }
+        ctx.translate(d.x, 0);
         break;
-      case "pool":
-        ctx.fillStyle = d.murk ? "rgba(90,130,70,0.72)" : "rgba(90,190,240,0.72)";
+      }
+      case "pool": {
+        ctx.translate(-d.x, 0);                    // back into world space
+        var tr2 = d._terrain, half = d.w / 2;
+        var lvl = tr2.heightAt(d.x) - 4;
         ctx.beginPath();
-        ctx.ellipse(0, 4, d.w / 2, 16, 0, 0, 6.283);
+        ctx.moveTo(d.x - half, lvl);
+        for (var px2 = d.x - half; px2 <= d.x + half; px2 += 6) {
+          ctx.lineTo(px2, Math.max(lvl, tr2.heightAt(px2)));
+        }
+        ctx.lineTo(d.x + half, lvl);
+        ctx.closePath();
+        ctx.fillStyle = d.murk ? "rgba(96,138,74,0.75)" : "rgba(86,186,238,0.75)";
         ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(d.x - half, lvl); ctx.lineTo(d.x + half, lvl);
+        ctx.stroke();
+        ctx.translate(d.x, 0);
         break;
+      }
       case "canyonwall":
         ctx.fillStyle = "#8A5230";
         ctx.fillRect(0, 6, d.w, 900);
@@ -553,6 +606,25 @@ window.JC = window.JC || {};
 
   R.drawRope = function (b) {
     var ctx = this.ctx;
+    var posts = b.userData.posts;
+
+    // posts first, so the rope reads as tied to them
+    if (posts) {
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = INK;
+      ctx.lineJoin = "round";
+      [posts.x1, posts.x2].forEach(function (px) {
+        ctx.fillStyle = "#8A5A32";
+        JC.rr(ctx, px - 6, posts.top - 12, 12, posts.deck - posts.top + 26, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#6B4020";                 // cap
+        JC.rr(ctx, px - 10, posts.top - 18, 20, 10, 4);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+
     ctx.beginPath();
     ctx.moveTo(b.pts[0].x, b.pts[0].y);
     for (var i = 1; i < b.pts.length; i++) ctx.lineTo(b.pts[i].x, b.pts[i].y);
@@ -560,6 +632,18 @@ window.JC = window.JC || {};
     ctx.strokeStyle = b.color;
     ctx.lineCap = "round";
     ctx.stroke();
+
+    // hangers from the hand rope down toward the deck
+    if (posts) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(107,64,32,0.8)";
+      for (var h = 1; h < b.pts.length - 1; h++) {
+        ctx.beginPath();
+        ctx.moveTo(b.pts[h].x, b.pts[h].y);
+        ctx.lineTo(b.pts[h].x, b.pts[h].y + 30);
+        ctx.stroke();
+      }
+    }
   };
 
   // ── truck ─────────────────────────────────────────────────────────────────
@@ -601,7 +685,7 @@ window.JC = window.JC || {};
     ctx.translate(-cc.x, -cc.y);
 
     // body — firm silhouette, but every point is the live squashed one
-    firmPath(ctx, ch.pts, ch.hull, 9);
+    firmPath(ctx, ch.pts, ch.hull, 4);
     ctx.fillStyle = (G && G.hurtFlash > 0) ? "#FFFFFF" : ch.color;
     ctx.fill();
     ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineJoin = "round";
@@ -613,24 +697,61 @@ window.JC = window.JC || {};
     ctx.fillRect(ch.min.x, ch.min.y, ch.max.x - ch.min.x, (ch.max.y - ch.min.y) * 0.42);
     ctx.restore();
 
-    // cab window, positioned from the actual (squashed) hull points
-    var p4 = ch.pts[4], p5 = ch.pts[5], p6 = ch.pts[6];
+    var P = ch.pts;
+
+    // the open bed: floor plus the inner face of the rails, set into the body
     ctx.beginPath();
-    ctx.moveTo(JC.lerp(p4.x, p5.x, 0.18), JC.lerp(p4.y, p5.y, 0.18) + 8);
-    ctx.lineTo(JC.lerp(p4.x, p5.x, 0.92), JC.lerp(p4.y, p5.y, 0.92) + 8);
-    ctx.lineTo(p6.x - 6, p6.y - 2);
-    ctx.lineTo(JC.lerp(p4.x, p5.x, 0.18) + 4, JC.lerp(p4.y, p5.y, 0.18) + 34);
+    ctx.moveTo(P[1].x, P[1].y);
+    ctx.lineTo(P[2].x, P[2].y);
+    ctx.lineTo(P[3].x, P[3].y);
+    ctx.lineTo(JC.lerp(P[3].x, P[4].x, 0.30), JC.lerp(P[3].y, P[4].y, 0.30));
     ctx.closePath();
-    ctx.fillStyle = "#BFE9FF";
+    ctx.fillStyle = JC.shade(ch.color, -0.42);
+    ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+
+    // plank line along the bed floor
+    ctx.beginPath();
+    ctx.moveTo(P[2].x + 5, P[2].y - 4);
+    ctx.lineTo(P[3].x - 5, P[3].y - 4);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = JC.shade(ch.color, -0.6);
+    ctx.stroke();
+
+    // the cab, as its own boxy volume
+    var cabL = { x: JC.lerp(P[4].x, P[5].x, 0.05), y: JC.lerp(P[4].y, P[5].y, 0.05) };
+    var cabR = { x: JC.lerp(P[4].x, P[5].x, 0.96), y: JC.lerp(P[4].y, P[5].y, 0.96) };
+    ctx.beginPath();
+    ctx.moveTo(P[3].x, P[3].y);
+    ctx.lineTo(cabL.x, cabL.y);
+    ctx.lineTo(cabR.x, cabR.y);
+    ctx.lineTo(P[6].x, P[6].y);
+    ctx.lineTo(JC.lerp(P[6].x, P[7].x, 0.55), JC.lerp(P[6].y, P[7].y, 0.55));
+    ctx.closePath();
+    ctx.fillStyle = JC.shade(ch.color, 0.10);
     ctx.fill();
     ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
 
-    // bed side stripe
+    // windscreen
+    var wA = { x: JC.lerp(cabL.x, cabR.x, 0.16), y: JC.lerp(cabL.y, cabR.y, 0.16) };
+    var wB = { x: JC.lerp(cabL.x, cabR.x, 0.90), y: JC.lerp(cabL.y, cabR.y, 0.90) };
+    var down = { x: (P[3].x - P[4].x) * 0.32, y: (P[3].y - P[4].y) * 0.32 };
     ctx.beginPath();
-    ctx.moveTo(ch.pts[0].x + 6, ch.pts[0].y + 14);
-    ctx.lineTo(ch.pts[3].x - 6, ch.pts[3].y - 12);
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = JC.shade(ch.color, -0.28);
+    ctx.moveTo(wA.x + down.x * 0.18, wA.y + down.y * 0.18);
+    ctx.lineTo(wB.x + down.x * 0.18, wB.y + down.y * 0.18);
+    ctx.lineTo(wB.x + down.x, wB.y + down.y);
+    ctx.lineTo(wA.x + down.x, wA.y + down.y);
+    ctx.closePath();
+    ctx.fillStyle = "#BFE9FF";
+    ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+
+    // grille
+    ctx.beginPath();
+    ctx.moveTo(JC.lerp(P[6].x, P[7].x, 0.28), JC.lerp(P[6].y, P[7].y, 0.28));
+    ctx.lineTo(JC.lerp(P[6].x, P[7].x, 0.60), JC.lerp(P[6].y, P[7].y, 0.60));
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = JC.shade(ch.color, -0.5);
     ctx.stroke();
     ctx.restore();
 

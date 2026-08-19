@@ -298,10 +298,7 @@ window.JC = window.JC || {};
     for (var d = 0; d < Math.floor(n / 8); d++) {
       decor.push({ t: r.chance(0.5) ? "tree" : "rock", x: r.range(0, n * STEP), s: r.range(0.8, 1.5) });
     }
-    if (r.chance(0.7)) {
-      var bx = r.range(120, n * STEP * 0.3);
-      specs.push({ t: "bridge", x: bx, x2: bx + r.range(160, 260), y: hs[Math.floor(bx / STEP)] - 4, deco: true });
-    }
+
     addCrates.call(this, specs, n, 0.6);
     return { hs: hs, decor: decor, specs: specs };
   };
@@ -481,7 +478,7 @@ window.JC = window.JC || {};
     var w = this.world, out = [];
     var x1 = s.x, x2 = s.x2, y = s.y;
     var span = x2 - x1;
-    var segs = Math.max(6, Math.round(span / 34));
+    var segs = Math.max(7, Math.round(span / 30));
     var sag = Math.min(46, span * 0.09);
 
     var deck = JC.makeRope(x1, y, x2, y, segs, { color: "#7A4B28", mass: 2.4 });
@@ -501,8 +498,8 @@ window.JC = window.JC || {};
     for (var k = 0; k < segs; k++) {
       var a = deck.pts[k], b = deck.pts[k + 1];
       var plank = JC.makeBox((a.x + b.x) / 2, (a.y + b.y) / 2 - 5,
-                             span / segs * 0.94, 11,
-                             { match: 0.9, color: "#9A6438", kind: "plank", friction: 0.85 });
+                             span / segs * 1.12, 15,
+                             { match: 0.95, color: "#9A6438", kind: "plank", friction: 0.85 });
       plank.userData.group = "bridge";
       plank.userData.noSelf = true;
       plank.userData.rope = { body: deck, i: k };
@@ -517,6 +514,7 @@ window.JC = window.JC || {};
     rail.userData.group = "bridge";
     rail.userData.noSelf = true;
     rail.userData.decor = true;
+    rail.userData.posts = { x1: x1, x2: x2, deck: y, top: railY };
     out.push(w.add(rail));
 
     return out;
