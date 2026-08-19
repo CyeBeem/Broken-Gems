@@ -588,7 +588,9 @@ window.JC = window.JC || {};
         break;
       }
       case "lake": {
-        ctx.translate(-d.x, 0);                    // back into world space
+        /* drawProp translated by BOTH d.x and gy, so undoing only x left
+           every lake floating gy pixels off the ground. */
+        ctx.translate(-d.x, -gy);                  // fully back into world space
         var tr2 = d._terrain, half = d.w / 2;
         // water sits just below the shallower of the two shores
         var lvl = Math.min(tr2.heightAt(d.x - half), tr2.heightAt(d.x + half)) + 5;
@@ -618,7 +620,7 @@ window.JC = window.JC || {};
           ctx.lineTo(rx + rw, lvl + 9 + ri * 7);
           ctx.stroke();
         }
-        ctx.translate(d.x, 0);
+        ctx.translate(d.x, gy);
         break;
       }
       case "canyonwall": {
