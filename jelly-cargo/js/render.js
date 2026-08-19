@@ -384,14 +384,27 @@ window.JC = window.JC || {};
         ctx.lineCap = "butt";
         break;
       }
-      case "bush":
+      case "bush": {
+        var BR = 19 * s, bl = 8, bw = d.x * 0.07;
         ctx.fillStyle = "#5FC456";
         ctx.beginPath();
-        ctx.arc(0, -14 * s, 17 * s, 0, 6.283);
-        ctx.arc(-14 * s, -8 * s, 13 * s, 0, 6.283);
-        ctx.arc(14 * s, -8 * s, 13 * s, 0, 6.283);
-        ctx.fill(); ctx.stroke();
+        for (var bi = 0; bi <= bl; bi++) {
+          var ba = Math.PI * 2 * (bi / bl) - Math.PI / 2;
+          var br0 = BR * (0.78 + 0.3 * Math.abs(Math.sin(bi * 1.9 + bw)));
+          var bx = Math.cos(ba) * br0 * 1.45;          // wider than tall
+          var by = -13 * s + Math.sin(ba) * br0 * 0.72;
+          if (bi === 0) ctx.moveTo(bx, by);
+          else ctx.quadraticCurveTo(
+            Math.cos(ba - 0.36) * br0 * 1.62,
+            -13 * s + Math.sin(ba - 0.36) * br0 * 0.86, bx, by);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.14)";
+        ctx.beginPath();
+        ctx.ellipse(-BR * 0.35, -20 * s, BR * 0.5, BR * 0.26, 0, 0, 6.283);
+        ctx.fill();
         break;
+      }
       case "flower":
         ctx.strokeStyle = "#3E9A48"; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -18 * s); ctx.stroke();
@@ -1182,6 +1195,47 @@ window.JC = window.JC || {};
       ctx.arc(x - 24 - (b % 2) * 22, gy - 40 - b * 74, 15, 0, 6.283);
       ctx.fill();
     }
+  };
+
+  /* Crosshair. The ring fills as the turret reloads, so you can time shots
+     without looking away from what you are aiming at. */
+  R.drawCursor = function (mx, my, ready) {
+    var ctx = this.ctx;
+    if (mx <= 0 && my <= 0) return;
+    ctx.save();
+    ctx.translate(mx, my);
+
+    // backing ring
+    ctx.strokeStyle = "rgba(43,42,56,0.45)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0, 6.283);
+    ctx.stroke();
+
+    // the reload sweep
+    ctx.strokeStyle = ready >= 1 ? "#7FE05F" : "#FFC93C";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, -Math.PI / 2, -Math.PI / 2 + 6.283 * ready);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    // ticks and a centre dot
+    ctx.strokeStyle = "#2B2A38";
+    ctx.lineWidth = 2.5;
+    [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (v) {
+      ctx.beginPath();
+      ctx.moveTo(v[0] * 6, v[1] * 6);
+      ctx.lineTo(v[0] * 10, v[1] * 10);
+      ctx.stroke();
+    });
+    ctx.fillStyle = ready >= 1 ? "#7FE05F" : "rgba(43,42,56,0.7)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.6, 0, 6.283);
+    ctx.fill();
+
+    ctx.restore();
   };
 
   /* The cargo stop itself — a little depot you pull up to. */

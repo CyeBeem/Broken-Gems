@@ -25,7 +25,7 @@ window.JC = window.JC || {};
       torque: 1, grip: 1, maxSpeed: 1, airControl: 0,
       boostPower: 1, fuelRegen: 6, fuelDur: 1.1,
 
-      goldMul: 1, sellMul: 1, luck: 0, magnet: 90, spillSave: 0, ram: 1,
+      goldMul: 1, sellMul: 1, luck: 0, magnet: 90, spillSave: 0, ram: 1, hopPower: 1,
       drones: 0, droneDmg: 0, droneEl: null
     };
   }
@@ -311,7 +311,8 @@ window.JC = window.JC || {};
     t.recoil = Math.max(0, t.recoil - dt * 6);
 
     if (!this.input.mouse.down || t.cool > 0 || this.atStop || this.paused) return;
-    t.cool = BASE_FIRE / this.stats.fireRate;
+    t.interval = BASE_FIRE / this.stats.fireRate;
+    t.cool = t.interval;
     t.recoil = 1;
     this.fireOnce(m, t.ang);
     for (var i = 0; i < this.stats.multishot; i++) {
@@ -442,7 +443,9 @@ window.JC = window.JC || {};
       this.truck.boosting = 0;
     }
     this.truck.rechargeFuel(dt, s);
+    this.truck.tickHop(dt);
     this.truck.updateSquash(dt);
+    if (I.tapped(" ")) this.truck.hop(s);
     this.truck.selfRight(dt);
 
     // keyed abilities
@@ -505,6 +508,9 @@ window.JC = window.JC || {};
         continue;
       }
 
+      // loose props take the hit and get shoved out of the way
+      if (this.shoveProp(b)) { this.bullets.splice(i, 1); continue; }
+
       // friendly vs enemies
       var hits = this.enemiesIn(b.x, b.y, b.size + 14);
       for (var h = 0; h < hits.length; h++) {
@@ -522,6 +528,30 @@ window.JC = window.JC || {};
         else { this.bullets.splice(i, 1); break; }
       }
     }
+  };
+
+  /* Returns true if the bullet was spent on a prop. */
+  G.shoveProp = function (b) {
+    var list = this.world.bodies;
+    for (var i = 0; i < list.length; i++) {
+      var pb = list[i];
+      if (pb.userData.group !== "prop") continue;
+      if (b.x < pb.min.x || b.x > pb.max.x || b.y < pb.min.y || b.y > pb.max.y) continue;
+      if (!JC.pointInHull(pb, b.x, b.y)) continue;
+
+      var sp = Math.hypot(b.vx, b.vy) || 1;
+      var pinned = pb.pts.length && pb.pts[0].inv === 0;
+      if (!pinned) {
+        var k = 2.4 + b.dmg * 1.3;
+        // a little lift so it skips rather than grinding along the dirt
+        pb.impulse(b.vx / sp * k, b.vy / sp * k - k * 0.35);
+        pb.sleeping = false;
+      }
+      this.fx.burst(b.x, b.y, pb.color, 7);
+      this.shake(1.5);
+      return true;
+    }
+    return false;
   };
 
   G.updateEnemies = function (dt) {
@@ -1001,6 +1031,12 @@ window.JC = window.JC || {};
     R.drawBullets(this.bullets);
     R.drawFX(this.fx);
     R.end();
+
+    if (!this.over && !this.atStop) {
+      var t = this.truck.turret;
+      var ready = t.interval ? JC.clamp(1 - t.cool / t.interval, 0, 1) : 1;
+      R.drawCursor(this.input.mouse.x, this.input.mouse.y, ready);
+    }
   };
 
   G.destroy = function () {

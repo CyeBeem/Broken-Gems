@@ -31,6 +31,7 @@ window.JC = window.JC || {};
     this.wheelSpin = [0, 0];
     this.airTime = 0;
     this.flipTimer = 0;
+    this.hopCool = 0;
     this.squash = 0;      // spikes on impact, decays
     this.stretch = 0;     // positive while falling
     this.lastVy = 0;
@@ -185,6 +186,31 @@ window.JC = window.JC || {};
     this.stretch = JC.clamp(v.y * 0.05, -0.08, 0.28);
   };
 
+  /* A short hop, for clearing a log or a line of spikes. Only off the
+     ground, and only when the cooldown has run down. */
+  T.hop = function (stats) {
+    if (this.hopCool > 0) return false;
+    if (!(this.wheels[0].grounded || this.wheels[1].grounded || this.chassis.grounded)) {
+      return false;
+    }
+    this.hopCool = 0.6;
+
+    // straight up in the truck own frame, so it hops off a slope sensibly
+    var a = this.chassis.angle();
+    var ux = Math.sin(a), uy = -Math.cos(a);
+    var p = 4.6 * (stats && stats.hopPower ? stats.hopPower : 1);
+
+    this.chassis.impulse(ux * p, uy * p);
+    for (var i = 0; i < this.wheels.length; i++) {
+      this.wheels[i].impulse(ux * p, uy * p);
+    }
+    // the load gets a smaller nudge, so a hop can rattle it but rarely spill it
+    for (var c = 0; c < this.crates.length; c++) {
+      this.crates[c].impulse(ux * p * 0.55, uy * p * 0.55);
+    }
+    return true;
+  };
+
   /* Rotate the chassis about its centroid. */
   T.torque = function (amount) {
     if (!amount) return;
@@ -215,6 +241,10 @@ window.JC = window.JC || {};
       this.chassis.pts[i].y += fy * power;
     }
     return true;
+  };
+
+  T.tickHop = function (dt) {
+    if (this.hopCool > 0) this.hopCool = Math.max(0, this.hopCool - dt);
   };
 
   T.rechargeFuel = function (dt, stats) {

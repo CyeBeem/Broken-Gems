@@ -393,20 +393,75 @@ window.JC = window.JC || {};
     var self = this;
     var p = this.panel("pause");
     p.appendChild(el("h2", "panel-title", "Paused"));
-    var b = el("button", "big-btn", "Resume");
-    b.addEventListener("click", function () { self.clear(); resume(); });
-    p.appendChild(b);
+    p.appendChild(el("p", "panel-sub", "Tab or Esc to carry on"));
 
-    var save = el("button", "mini-btn", "Save & Quit To Title");
-    save.style.margin = "14px auto 0";
-    save.addEventListener("click", function () {
+    // where the run stands
+    var grid = el("div", "final-grid");
+    [["Distance", Math.round(G.distance / 40) + " m"],
+     ["Leg", String(G.leg + 1)],
+     ["Goblins", String(G.kills)],
+     ["Gold", String(G.gold)],
+     ["Cargo", G.truck.crates.length + " / " + G.stats.cargoSlots],
+     ["Abilities", String(G.abilities.count())]
+    ].forEach(function (r) {
+      var cell = el("div", "final-cell");
+      cell.appendChild(el("div", "final-v", r[1]));
+      cell.appendChild(el("div", "final-k", r[0]));
+      grid.appendChild(cell);
+    });
+    p.appendChild(grid);
+
+    if (G.abilities.count()) {
+      p.appendChild(el("h3", "sec-title", "Your Build"));
+      var row = el("div", "build-row");
+      G.abilities.order.forEach(function (id) {
+        var a = JC.ABILITIES[id];
+        var pip = el("div", "ab-pip el-" + a.el);
+        pip.appendChild(el("span", "ab-name", a.name));
+        pip.appendChild(el("span", "ab-lv", "L" + G.abilities.level(id)));
+        row.appendChild(pip);
+      });
+      p.appendChild(row);
+    }
+
+    var gear = G.gear.filter(function (g) { return g.kind === "gear"; });
+    if (gear.length) {
+      p.appendChild(el("h3", "sec-title", "Fitted Gear"));
+      var grow = el("div", "build-row");
+      gear.forEach(function (g) {
+        var pip = el("div", "ab-pip");
+        pip.appendChild(el("span", "ab-name", g.name));
+        pip.appendChild(el("span", "ab-lv", g.gradeName || ""));
+        grow.appendChild(pip);
+      });
+      p.appendChild(grow);
+    }
+
+    var cont = el("button", "big-btn", "Continue");
+    cont.addEventListener("click", function () { self.clear(); resume(); });
+    p.appendChild(cont);
+
+    var row2 = el("div", "transfer");
+    var menu = el("button", "mini-btn", "Main Menu");
+    menu.title = "Saves your run first";
+    menu.addEventListener("click", function () {
       JC.Save.saveRun(G);
       location.reload();
     });
-    p.appendChild(save);
-    var home = el("a", "quiet-link", "← Broken Gems");
-    home.href = "../";
-    p.appendChild(home);
+    var again = el("button", "mini-btn", "Restart Run");
+    again.addEventListener("click", function () {
+      if (!confirm("Abandon this run and start a fresh one?")) return;
+      JC.restart();
+    });
+    var site = el("button", "mini-btn", "Broken Gems");
+    site.addEventListener("click", function () {
+      JC.Save.saveRun(G);
+      window.location.href = "../";
+    });
+    row2.appendChild(menu);
+    row2.appendChild(again);
+    row2.appendChild(site);
+    p.appendChild(row2);
   };
 
 })(window.JC);

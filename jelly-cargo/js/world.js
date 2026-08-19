@@ -439,12 +439,12 @@ window.JC = window.JC || {};
     var gy = t.heightAt(s.x);
 
     if (s.t === "crate") {
-      var b = JC.makeBox(s.x, gy - 26, 40, 40, { match: 0.5, color: "#C98A4B", kind: "prop", friction: 0.5 });
+      var b = JC.makeBox(s.x, gy - 26, 40, 40, { match: 0.5, color: "#C98A4B", kind: "prop", friction: 0.22 });
       b.userData.group = "prop";
       out.push(w.add(b));
 
     } else if (s.t === "log") {
-      var lg = JC.makeBox(s.x, gy - 22, 120, 34, { match: 0.6, color: "#8A5A32", kind: "prop", friction: 0.6 });
+      var lg = JC.makeBox(s.x, gy - 22, 120, 34, { match: 0.6, color: "#8A5A32", kind: "prop", friction: 0.24 });
       lg.userData.group = "prop";
       out.push(w.add(lg));
 
@@ -452,7 +452,7 @@ window.JC = window.JC || {};
       for (var i = 0; i < (s.n || 3); i++) {
         var r = 22 + (i % 2) * 8;
         var bl = JC.makeWheel(s.x + i * 62, gy - r - 4, r, 8,
-          { match: 0.75, pressure: 0.5, color: "#9AA7B4", kind: "prop", friction: 0.5 });
+          { match: 0.75, pressure: 0.5, color: "#9AA7B4", kind: "prop", friction: 0.2 });
         bl.userData.group = "prop";
         out.push(w.add(bl));
       }

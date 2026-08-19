@@ -109,7 +109,10 @@
 
     window.addEventListener("resize", fit);
     window.addEventListener("keydown", function (e) {
-      if (e.key !== "Escape" || !game || game.over || game.atStop) return;
+      if (e.key !== "Escape" && e.key !== "Tab") return;
+      if (e.key === "Tab") e.preventDefault();      // never move focus mid-run
+      if (!game || game.over || game.atStop) return;
+      if (!document.getElementById("title").classList.contains("gone")) return;
       if (game.paused) { ui.clear(); game.paused = false; }
       else { game.paused = true; ui.showPause(game, function () { game.paused = false; }); }
     });

@@ -9,7 +9,7 @@ window.JC = window.JC || {};
   JC.ENEMIES = {
     runner: {
       name: "Goblin", hp: 2, r: 17, spd: 130, dmg: 6, cargoDmg: 0, gold: 4,
-      threat: 0, weight: 10, air: false, color: "#7FBF4F",
+      threat: 0, weight: 10, air: false, color: "#7FBF4F", noScale: true,
       blurb: "Runs at you shrieking. Not complicated."
     },
     moto: {
@@ -101,7 +101,9 @@ window.JC = window.JC || {};
   // ── enemy ─────────────────────────────────────────────────────────────────
   JC.Enemy = function (type, x, y, scale) {
     var d = JC.ENEMIES[type];
-    scale = Math.max(1, scale || 1);
+    /* Starter goblins are the yardstick for "two bullets", so their health
+       never scales. Difficulty comes from numbers and from nastier types. */
+    scale = d.noScale ? 1 : Math.max(1, scale || 1);
     this.type = type;
     this.def = d;
     this.x = x; this.y = y;
