@@ -354,14 +354,36 @@ window.JC = window.JC || {};
           ctx.closePath(); ctx.fill(); ctx.stroke();
         }
         break;
-      case "deadtree":
-        trunk(ctx, 8 * s, 60 * s);
-        ctx.strokeStyle = "#6A5A3A"; ctx.lineWidth = 6 * s;
+      case "deadtree": {
+        ctx.fillStyle = "#6E5C3E";
+        ctx.strokeStyle = INK; ctx.lineWidth = 3.5;
+        // tapered trunk
         ctx.beginPath();
-        ctx.moveTo(0, -50 * s); ctx.lineTo(-24 * s, -76 * s);
-        ctx.moveTo(0, -58 * s); ctx.lineTo(26 * s, -80 * s);
-        ctx.stroke();
+        ctx.moveTo(-7 * s, 0);
+        ctx.quadraticCurveTo(-5 * s, -40 * s, -3.5 * s, -78 * s);
+        ctx.lineTo(3.5 * s, -78 * s);
+        ctx.quadraticCurveTo(5.5 * s, -40 * s, 7 * s, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // a few crooked limbs that taper as they go
+        ctx.strokeStyle = "#6E5C3E";
+        ctx.lineCap = "round";
+        [[-1, 0.55, 30], [1, 0.72, 26], [-1, 0.86, 18]].forEach(function (L) {
+          var by = -78 * s * L[1];
+          ctx.lineWidth = 5.5 * s;
+          ctx.beginPath();
+          ctx.moveTo(0, by);
+          ctx.quadraticCurveTo(L[0] * L[2] * 0.6 * s, by - 8 * s,
+                               L[0] * L[2] * s, by - 20 * s);
+          ctx.stroke();
+          ctx.lineWidth = 3 * s;
+          ctx.beginPath();
+          ctx.moveTo(L[0] * L[2] * s, by - 20 * s);
+          ctx.lineTo(L[0] * L[2] * 1.4 * s, by - 34 * s);
+          ctx.stroke();
+        });
+        ctx.lineCap = "butt";
         break;
+      }
       case "bush":
         ctx.fillStyle = "#5FC456";
         ctx.beginPath();
@@ -486,69 +508,139 @@ window.JC = window.JC || {};
         ctx.closePath(); ctx.fill();
         break;
       }
-      case "mesa":
-        ctx.fillStyle = "rgba(200,122,72,0.55)";
+      case "mesa": {
+        var dep = d.depth || 0;
+        var fade = 0.62 - dep * 0.15;
+        var mh = 130 * s * (1 - dep * 0.16), mw = 78 * s;
+        ctx.fillStyle = "rgba(186,110,66," + fade.toFixed(2) + ")";
         ctx.beginPath();
-        ctx.moveTo(-70 * s, 40); ctx.lineTo(-52 * s, -120 * s);
-        ctx.lineTo(52 * s, -120 * s); ctx.lineTo(70 * s, 40);
+        ctx.moveTo(-mw, 40);
+        ctx.lineTo(-mw * 0.80, -mh * 0.62);
+        ctx.lineTo(-mw * 0.66, -mh);
+        ctx.lineTo(mw * 0.66, -mh);
+        ctx.lineTo(mw * 0.80, -mh * 0.62);
+        ctx.lineTo(mw, 40);
+        ctx.closePath(); ctx.fill();
+        // lit cap and a shaded flank, so it has some form
+        ctx.fillStyle = "rgba(226,158,104," + (fade * 0.7).toFixed(2) + ")";
+        ctx.beginPath();
+        ctx.moveTo(-mw * 0.66, -mh); ctx.lineTo(mw * 0.66, -mh);
+        ctx.lineTo(mw * 0.58, -mh * 0.9); ctx.lineTo(-mw * 0.58, -mh * 0.9);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "rgba(120,66,40," + (fade * 0.35).toFixed(2) + ")";
+        ctx.beginPath();
+        ctx.moveTo(mw * 0.66, -mh); ctx.lineTo(mw * 0.80, -mh * 0.62);
+        ctx.lineTo(mw, 40); ctx.lineTo(mw * 0.5, 40);
         ctx.closePath(); ctx.fill();
         break;
+      }
       case "waterfall": {
-        ctx.translate(-d.x, 0);                    // back into world space
-        var terr = d._terrain;
-        var wx0 = d.x - d.w * 0.45, wx1 = d.x + d.w * 1.5, ws = 7;
+        var fh = d.h, fw = d.w;
+        // the cliff it comes off, hazy like the other distant rock
+        ctx.fillStyle = "rgba(140,158,168,0.55)";
         ctx.beginPath();
-        ctx.moveTo(wx0, terr.heightAt(wx0) - 3);
-        for (var wx = wx0; wx <= wx1; wx += ws) ctx.lineTo(wx, terr.heightAt(wx) - 3);
-        ctx.lineTo(wx1, terr.heightAt(wx1) + 200);
-        ctx.lineTo(wx0, terr.heightAt(wx0) + 200);
+        ctx.moveTo(-fw * 2.6, 20);
+        ctx.lineTo(-fw * 2.1, -fh * 1.05);
+        ctx.lineTo(fw * 2.3, -fh * 0.95);
+        ctx.lineTo(fw * 2.8, 20);
+        ctx.closePath(); ctx.fill();
+
+        // the fall itself
+        ctx.fillStyle = "rgba(178,226,250,0.85)";
+        ctx.beginPath();
+        ctx.moveTo(-fw / 2, -fh);
+        ctx.lineTo(fw / 2, -fh);
+        ctx.lineTo(fw * 0.72, 6);
+        ctx.lineTo(-fw * 0.72, 6);
+        ctx.closePath(); ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.75)";
+        ctx.lineWidth = 3;
+        for (var st = 0; st < 5; st++) {
+          var sxp = -fw * 0.38 + st * (fw * 0.19);
+          var off = (performance.now() / 6 + st * 47) % fh;
+          ctx.beginPath();
+          ctx.moveTo(sxp, -fh + off);
+          ctx.lineTo(sxp, -fh + off + fh * 0.22);
+          ctx.stroke();
+        }
+
+        // mist where it lands
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        for (var mi = 0; mi < 5; mi++) {
+          var mx = (mi - 2) * fw * 0.42;
+          var mr = fw * (0.34 + 0.1 * Math.sin(performance.now() / 700 + mi));
+          ctx.beginPath(); ctx.ellipse(mx, 6, mr, mr * 0.5, 0, 0, 6.283); ctx.fill();
+        }
+        break;
+      }
+      case "lake": {
+        ctx.translate(-d.x, 0);                    // back into world space
+        var tr2 = d._terrain, half = d.w / 2;
+        // water sits just below the shallower of the two shores
+        var lvl = Math.min(tr2.heightAt(d.x - half), tr2.heightAt(d.x + half)) + 5;
+        ctx.beginPath();
+        ctx.moveTo(d.x - half, lvl);
+        for (var px2 = d.x - half; px2 <= d.x + half; px2 += 5) {
+          ctx.lineTo(px2, Math.max(lvl, tr2.heightAt(px2)));
+        }
+        ctx.lineTo(d.x + half, lvl);
         ctx.closePath();
-        ctx.fillStyle = "rgba(120,205,245,0.8)";
+        ctx.fillStyle = d.murk ? "rgba(104,142,84,0.82)" : "rgba(96,192,238,0.82)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+
+        // surface line plus a couple of ripples
+        ctx.strokeStyle = "rgba(255,255,255,0.65)";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(wx0, terr.heightAt(wx0) - 3);
-        for (var wx2 = wx0; wx2 <= wx1; wx2 += ws) ctx.lineTo(wx2, terr.heightAt(wx2) - 3);
+        ctx.moveTo(d.x - half, lvl); ctx.lineTo(d.x + half, lvl);
         ctx.stroke();
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.lineWidth = 2.5;
-        for (var st = 0; st < 8; st++) {
-          var sxp = d.x + st * 10 - 24;
-          var top = terr.heightAt(sxp);
-          var off = (performance.now() / 7 + st * 34) % 80;
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 2;
+        for (var ri = 0; ri < 3; ri++) {
+          var rx = d.x - half * 0.5 + ri * half * 0.5;
+          var rw = 16 + 5 * Math.sin(performance.now() / 500 + ri);
           ctx.beginPath();
-          ctx.moveTo(sxp, top + off); ctx.lineTo(sxp, top + off + 30);
+          ctx.moveTo(rx - rw, lvl + 9 + ri * 7);
+          ctx.lineTo(rx + rw, lvl + 9 + ri * 7);
           ctx.stroke();
         }
         ctx.translate(d.x, 0);
         break;
       }
-      case "pool": {
-        ctx.translate(-d.x, 0);                    // back into world space
-        var tr2 = d._terrain, half = d.w / 2;
-        var lvl = tr2.heightAt(d.x) - 4;
+      case "canyonwall": {
+        var cw = d.w;
+        // the dark of the gorge
+        var g2 = ctx.createLinearGradient(0, 0, 0, 520);
+        g2.addColorStop(0, "#7A4A2C");
+        g2.addColorStop(1, "#2E1C12");
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, 4, cw, 900);
+        // near and far wall faces, stepped so they read as rock
+        ctx.fillStyle = "rgba(154,92,54,0.95)";
         ctx.beginPath();
-        ctx.moveTo(d.x - half, lvl);
-        for (var px2 = d.x - half; px2 <= d.x + half; px2 += 6) {
-          ctx.lineTo(px2, Math.max(lvl, tr2.heightAt(px2)));
+        ctx.moveTo(0, 4);
+        ctx.lineTo(cw * 0.17, 90); ctx.lineTo(cw * 0.09, 230);
+        ctx.lineTo(cw * 0.20, 420); ctx.lineTo(cw * 0.12, 900);
+        ctx.lineTo(0, 900);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "rgba(120,70,40,0.95)";
+        ctx.beginPath();
+        ctx.moveTo(cw, 4);
+        ctx.lineTo(cw * 0.83, 110); ctx.lineTo(cw * 0.91, 260);
+        ctx.lineTo(cw * 0.80, 450); ctx.lineTo(cw * 0.88, 900);
+        ctx.lineTo(cw, 900);
+        ctx.closePath(); ctx.fill();
+        // strata
+        ctx.strokeStyle = "rgba(0,0,0,0.14)";
+        ctx.lineWidth = 4;
+        for (var ly2 = 70; ly2 < 470; ly2 += 74) {
+          ctx.beginPath();
+          ctx.moveTo(cw * 0.10, ly2); ctx.lineTo(cw * 0.90, ly2 + 8);
+          ctx.stroke();
         }
-        ctx.lineTo(d.x + half, lvl);
-        ctx.closePath();
-        ctx.fillStyle = d.murk ? "rgba(96,138,74,0.75)" : "rgba(86,186,238,0.75)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(d.x - half, lvl); ctx.lineTo(d.x + half, lvl);
-        ctx.stroke();
-        ctx.translate(d.x, 0);
         break;
       }
-      case "canyonwall":
-        ctx.fillStyle = "#8A5230";
-        ctx.fillRect(0, 6, d.w, 900);
-        break;
       case "cablecar":
         ctx.strokeStyle = "#6E6250"; ctx.lineWidth = 7;
         ctx.beginPath();
@@ -578,6 +670,8 @@ window.JC = window.JC || {};
     for (var i = 0; i < world.bodies.length; i++) {
       var b = world.bodies[i];
       if (b === truck.chassis || truck.wheels.indexOf(b) >= 0) continue;
+      // crates in the bed are drawn with the truck so the bed does not cover them
+      if (truck.crates.indexOf(b) >= 0) continue;
       if (b.max.x < this.viewLeft() || b.min.x > this.viewRight()) continue;
 
       if (b.kind === "rope") { this.drawRope(b); continue; }
@@ -717,6 +811,22 @@ window.JC = window.JC || {};
     ctx.lineWidth = 3;
     ctx.strokeStyle = JC.shade(ch.color, -0.6);
     ctx.stroke();
+
+    // the load, sitting in the bed
+    for (var ci = 0; ci < truck.crates.length; ci++) {
+      var crate = truck.crates[ci];
+      firmPath(ctx, crate.pts, crate.hull, 4);
+      ctx.fillStyle = crate.color;
+      ctx.fill();
+      ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,0.22)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(crate.pts[0].x, crate.pts[0].y); ctx.lineTo(crate.pts[2].x, crate.pts[2].y);
+      ctx.moveTo(crate.pts[1].x, crate.pts[1].y); ctx.lineTo(crate.pts[3].x, crate.pts[3].y);
+      ctx.stroke();
+    }
 
     // the cab, as its own boxy volume
     var cabL = { x: JC.lerp(P[4].x, P[5].x, 0.05), y: JC.lerp(P[4].y, P[5].y, 0.05) };

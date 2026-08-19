@@ -101,6 +101,7 @@ window.JC = window.JC || {};
   // ── enemy ─────────────────────────────────────────────────────────────────
   JC.Enemy = function (type, x, y, scale) {
     var d = JC.ENEMIES[type];
+    scale = Math.max(1, scale || 1);
     this.type = type;
     this.def = d;
     this.x = x; this.y = y;
@@ -337,7 +338,7 @@ window.JC = window.JC || {};
     var pool = this.available(G);
     var self = this;
     var count = JC.clamp(1 + Math.floor(th / 70), 1, 7);
-    var scale = 1 + th / 300;
+    var scale = 1 + Math.max(0, th - 60) / 420;
 
     // gap between waves shrinks as things get hairier
     this.timer = JC.clamp(9.5 - th / 60, 2.4, 9.5) * this.rng.range(0.8, 1.2);

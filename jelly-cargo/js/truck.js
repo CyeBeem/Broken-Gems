@@ -36,19 +36,19 @@ window.JC = window.JC || {};
     this.lastVy = 0;
 
     // ── chassis ──
-    var ch = new JC.Body({ match: 0.06, friction: 0.35, color: "#E8453C", kind: "truck" });
+    var ch = new JC.Body({ match: 0.14, friction: 0.35, color: "#E8453C", kind: "truck" });
     var i;
     var NOSE = { 6: 1, 7: 1 };                 // engine bay, up front
     for (i = 0; i < HULL.length; i++) {
       ch.add(x + HULL[i][0], y + HULL[i][1], NOSE[i] ? 3.1 : 1.6);
       ch.hull.push(i);
     }
-    for (i = 0; i < HULL.length; i++) ch.link(i, (i + 1) % HULL.length, 0.30);
+    for (i = 0; i < HULL.length; i++) ch.link(i, (i + 1) % HULL.length, 0.55);
     // internal bracing, every non-adjacent pair at reduced stiffness
     for (i = 0; i < HULL.length; i++) {
       for (var j = i + 2; j < HULL.length; j++) {
         if (i === 0 && j === HULL.length - 1) continue;
-        ch.link(i, j, 0.085);
+        ch.link(i, j, 0.22);
       }
     }
     ch.bake();
@@ -124,7 +124,7 @@ window.JC = window.JC || {};
   T.drive = function (dt, throttle, lean, stats) {
     var torque = (stats.torque || 1);
     var grip = (stats.grip || 1);
-    var maxSpd = (stats.maxSpeed || 1) * 2.28;
+    var maxSpd = (stats.maxSpeed || 1) * 1.45;
 
     var v = this.chassis.velocity();
     var speed = v.x;
@@ -135,7 +135,7 @@ window.JC = window.JC || {};
       var t = over ? 0 : throttle;
       // grounded wheels bite, airborne ones just spin up
       var bite = wheel.grounded ? 1 : 0.22;
-      wheel.spin += t * torque * 0.30 * bite * grip;
+      wheel.spin += t * torque * 0.165 * bite * grip;
       this.wheelSpin[i] = JC.lerp(this.wheelSpin[i], t * 9, 0.25);
     }
 
@@ -150,7 +150,7 @@ window.JC = window.JC || {};
 
     // leaning: gentle with the wheels down, full authority once airborne
     if (lean) {
-      this.torque(((onGround ? 7 : 44)) * lean * dt);
+      this.torque(((onGround ? 5 : 26)) * lean * dt);
     }
 
     /* With wheels on the ground the chassis wants to sit level with the slope.
@@ -160,12 +160,16 @@ window.JC = window.JC || {};
       var c2 = this.chassis.centroid();
       var target = Math.atan(JC.clamp(terr.slopeAt(c2.x), -1.2, 1.2));
       var err = JC.angDiff(this.chassis.angle(), target);
-      this.torque(JC.clamp(err, -1, 1) * 62 * (1 + (stats.stability || 0)) * dt);
+      this.torque(JC.clamp(err, -1, 1) * 130 * (1 + (stats.stability || 0)) * dt);
     }
 
     // airborne tracking, for the flip-recovery feel
     if (!this.chassis.grounded && !this.wheels[0].grounded && !this.wheels[1].grounded) {
       this.airTime += dt;
+      if (!lean) {                                  // no input: settle level
+        var lv = JC.angDiff(this.chassis.angle(), 0);
+        this.torque(JC.clamp(lv, -1, 1) * 34 * dt);
+      }
     } else {
       this.airTime = 0;
     }
@@ -295,7 +299,7 @@ window.JC = window.JC || {};
   T.selfRight = function (dt) {
     if (!this.isUpsideDown()) { this.flipTimer = 0; return false; }
     this.flipTimer += dt;
-    if (this.flipTimer < 2.2) return false;
+    if (this.flipTimer < 1.1) return false;
     var c = this.chassis.centroid();
     var dir = this.angle() > 0 ? -1 : 1;
     for (var i = 0; i < this.chassis.pts.length; i++) {

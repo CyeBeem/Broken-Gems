@@ -276,8 +276,9 @@ window.JC = window.JC || {};
     specs.push({ t: "bridge", x: gapStart * STEP, x2: gapEnd * STEP, y: lip });
     decor.push({ t: "canyonwall", x: gapStart * STEP, w: gapLen * STEP, y: lip, back: true });
 
-    for (var d = 0; d < Math.floor(n / 9); d++) {
-      decor.push({ t: "mesa", x: r.range(0, n * STEP), s: r.range(0.8, 1.8), back: true });
+    for (var d = 0; d < 3; d++) {
+      decor.push({ t: "mesa", x: r.range(0, n * STEP), s: r.range(1.5, 2.6),
+                   back: true, depth: d });
     }
     addCrates.call(this, specs, n, 0.6);
     return { hs: hs, gaps: gaps, decor: decor, specs: specs };
@@ -293,8 +294,15 @@ window.JC = window.JC || {};
       var settle = i < 12 ? (1 - i / 12) : 0;
       hs.push(startY + v * (1 - settle));
     }
-    decor.push({ t: "waterfall", x: dropAt * STEP, h: drop, w: r.range(90, 170) });
-    decor.push({ t: "pool", x: (dropAt + 16) * STEP, w: r.range(200, 340) });
+    // a proper basin for the lake, gentle enough to drive out of
+    var lakeAt = dropAt + 20, lakeLen = 24, deep = 44;
+    for (var q = 0; q < lakeLen && lakeAt + q < n; q++) {
+      hs[lakeAt + q] += Math.sin((q / lakeLen) * Math.PI) * deep;
+    }
+    decor.push({ t: "waterfall", x: (dropAt - 6) * STEP, back: true,
+                 h: r.range(240, 380), w: r.range(46, 74) });
+    decor.push({ t: "lake", x: (lakeAt + lakeLen / 2) * STEP,
+                 w: lakeLen * STEP, deep: deep });
     for (var d = 0; d < Math.floor(n / 8); d++) {
       decor.push({ t: r.chance(0.5) ? "tree" : "rock", x: r.range(0, n * STEP), s: r.range(0.8, 1.5) });
     }
@@ -337,6 +345,8 @@ window.JC = window.JC || {};
     }
     for (var d = 0; d < Math.floor(n / 10); d++) {
       decor.push({ t: r.chance(0.6) ? "cactus" : "rock", x: r.range(0, n * STEP), s: r.range(0.8, 1.5) });
+      if (r.chance(0.25)) decor.push({ t: "mesa", x: r.range(0, n * STEP),
+                                       s: r.range(1.4, 2.2), back: true, depth: r.int(0, 2) });
     }
     if (r.chance(0.5)) decor.push({ t: "skull", x: r.range(100, n * STEP - 100), s: 1 });
     addCrates.call(this, specs, n, 0.5);
@@ -352,7 +362,13 @@ window.JC = window.JC || {};
     }
     var pools = r.int(2, 4);
     for (var p = 0; p < pools; p++) {
-      decor.push({ t: "pool", x: r.range(100, n * STEP - 200), w: r.range(130, 260), murk: true });
+      var px0 = Math.floor(r.range(6, n - 30));
+      var plen = r.int(12, 20), pdeep = r.range(22, 38);
+      for (var pq = 0; pq < plen && px0 + pq < n; pq++) {
+        hs[px0 + pq] += Math.sin((pq / plen) * Math.PI) * pdeep;
+      }
+      decor.push({ t: "lake", x: (px0 + plen / 2) * STEP, w: plen * STEP,
+                   deep: pdeep, murk: true });
     }
     for (var d = 0; d < Math.floor(n / 6); d++) {
       decor.push({ t: r.chance(0.5) ? "reed" : "deadtree", x: r.range(0, n * STEP), s: r.range(0.8, 1.6) });
