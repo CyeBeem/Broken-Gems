@@ -314,7 +314,7 @@ window.JC = window.JC || {};
      pack size and stat scale climb with it too. */
   JC.Director = function (seed) {
     this.rng = JC.rng(seed + 555);
-    this.timer = 3.5;
+    this.timer = 11;
     this.wave = 0;
   };
 
@@ -339,15 +339,15 @@ window.JC = window.JC || {};
     var th = this.threat(G);
 
     // hard ceiling on how many can be chasing you at once
-    var cap = JC.clamp(9 + Math.floor(th / 45), 9, 24);
+    var cap = JC.clamp(3 + Math.floor(th / 38), 3, 24);
     if (G.enemies.length >= cap) { this.timer = 1.4; return; }
     var pool = this.available(G);
     var self = this;
-    var count = JC.clamp(1 + Math.floor(th / 70), 1, 7);
+    var count = JC.clamp(1 + Math.floor(th / 85), 1, 7);
     var scale = 1 + Math.max(0, th - 60) / 420;
 
     // gap between waves shrinks as things get hairier
-    this.timer = JC.clamp(9.5 - th / 60, 2.4, 9.5) * this.rng.range(0.8, 1.2);
+    this.timer = JC.clamp(15 - th / 42, 2.4, 15) * this.rng.range(0.85, 1.2);
     this.wave++;
 
     count = Math.min(count, cap - G.enemies.length);

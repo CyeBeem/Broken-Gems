@@ -125,7 +125,7 @@ window.JC = window.JC || {};
   T.drive = function (dt, throttle, lean, stats) {
     var torque = (stats.torque || 1);
     var grip = (stats.grip || 1);
-    var maxSpd = (stats.maxSpeed || 1) * 1.35;
+    var maxSpd = (stats.maxSpeed || 1) * 2.10;
 
     var v = this.chassis.velocity();
     var speed = v.x;
@@ -204,15 +204,15 @@ window.JC = window.JC || {};
     // straight up in the truck own frame, so it hops off a slope sensibly
     var a = this.chassis.angle();
     var ux = Math.sin(a), uy = -Math.cos(a);
-    var p = 4.6 * (stats && stats.hopPower ? stats.hopPower : 1);
+    var p = 5.95 * (stats && stats.hopPower ? stats.hopPower : 1);
 
     this.chassis.impulse(ux * p, uy * p);
     for (var i = 0; i < this.wheels.length; i++) {
       this.wheels[i].impulse(ux * p, uy * p);
     }
-    // the load gets a smaller nudge, so a hop can rattle it but rarely spill it
+    // the load rides up with the truck; a bad landing or a ram can still spill it
     for (var c = 0; c < this.crates.length; c++) {
-      this.crates[c].impulse(ux * p * 0.55, uy * p * 0.55);
+      this.crates[c].impulse(ux * p * 0.92, uy * p * 0.92);
     }
     return true;
   };
