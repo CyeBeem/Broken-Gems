@@ -18,7 +18,7 @@ window.JC = window.JC || {};
       pierce: 0, multishot: 0, crit: 0.03, critMul: 2, homing: 0, splash: 0,
       phase: false, bulletEat: 0,
 
-      truckHp: 100, cargoHp: 100, armor: 0, regen: 0, cargoRegen: 0,
+      truckHp: 100, cargoHp: 200, armor: 0, regen: 0, cargoRegen: 0,
       cargoArmor: 0, cargoGrip: 0, cargoSlots: 6,
       shieldMax: 0, shieldRegen: 1, shieldDelay: 4, dodge: 0, thorns: 0,
       stability: 0, fallRes: 0, bounce: 0,
@@ -708,7 +708,7 @@ window.JC = window.JC || {};
          ground sits well under this; a real slam goes well over. */
       var bvel = box.velocity();
       var fast = Math.hypot(bvel.x - tv.x, bvel.y - tv.y) >
-                 3.2 * (1 + this.stats.cargoGrip * 1.9);
+                 6.4 * (1 + this.stats.cargoGrip * 1.9);
 
       /* A crate thrown this hard is on its way out. Let go of it completely
          apart from the floor — no settling, no damping, no side rails — or it

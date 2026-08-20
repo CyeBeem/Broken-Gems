@@ -314,6 +314,24 @@ window.JC = window.JC || {};
     }
   };
 
+  /* Wide scenery is drawn from the ground height at its centre, so anywhere
+     the ground falls away underneath it the base hangs in mid air. Measure the
+     drop across the footprint and push the base down by that much. Offsets are
+     relative to d.x. */
+  function baseDrop(d, lo, hi) {
+    var t = d._terrain;
+    if (!t) return 0;
+    var gy = t.heightAt(d.x);
+    if (gy > 90000) return 0;
+    var lowest = gy;
+    for (var x = lo; x <= hi; x += 16) {
+      var h = t.heightAt(d.x + x);
+      if (h > 90000) continue;              // a gap, nothing to sit on
+      if (h > lowest) lowest = h;
+    }
+    return lowest - gy;
+  }
+
   R.drawProp = function (d, gy) {
     var ctx = this.ctx;
     var s = d.s || 1;
@@ -496,9 +514,10 @@ window.JC = window.JC || {};
         ctx.restore();
         break;
       case "building":
+        var bgB = baseDrop(d, 0, d.w);
         ctx.fillStyle = d.far ? JC.shade(d.c, -0.3) : d.c;
-        ctx.fillRect(0, -d.h, d.w, d.h);
-        ctx.strokeRect(0, -d.h, d.w, d.h);
+        ctx.fillRect(0, -d.h, d.w, d.h + bgB);
+        ctx.strokeRect(0, -d.h, d.w, d.h + bgB);
         ctx.fillStyle = "rgba(255,255,255,0.75)";
         for (var wy = -d.h + 26; wy < -30; wy += 42) {
           for (var wx = 14; wx < d.w - 20; wx += 38) ctx.fillRect(wx, wy, 20, 24);
@@ -506,11 +525,12 @@ window.JC = window.JC || {};
         break;
       case "peak": {
         var H = 300 * s, W = 190 * s;
+        var pkB = 60 + baseDrop(d, -W, W);
         ctx.fillStyle = "rgba(176,199,219,0.5)";
         ctx.beginPath();
-        ctx.moveTo(-W, 60); ctx.lineTo(-W * 0.22, -H * 0.72);
+        ctx.moveTo(-W, pkB); ctx.lineTo(-W * 0.22, -H * 0.72);
         ctx.lineTo(0, -H); ctx.lineTo(W * 0.30, -H * 0.66);
-        ctx.lineTo(W, 60);
+        ctx.lineTo(W, pkB);
         ctx.closePath(); ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.6)";
         ctx.beginPath();
@@ -525,14 +545,15 @@ window.JC = window.JC || {};
         var dep = d.depth || 0;
         var fade = 0.62 - dep * 0.15;
         var mh = 130 * s * (1 - dep * 0.16), mw = 78 * s;
+        var msB = 40 + baseDrop(d, -mw, mw);
         ctx.fillStyle = "rgba(186,110,66," + fade.toFixed(2) + ")";
         ctx.beginPath();
-        ctx.moveTo(-mw, 40);
+        ctx.moveTo(-mw, msB);
         ctx.lineTo(-mw * 0.80, -mh * 0.62);
         ctx.lineTo(-mw * 0.66, -mh);
         ctx.lineTo(mw * 0.66, -mh);
         ctx.lineTo(mw * 0.80, -mh * 0.62);
-        ctx.lineTo(mw, 40);
+        ctx.lineTo(mw, msB);
         ctx.closePath(); ctx.fill();
         // lit cap and a shaded flank, so it has some form
         ctx.fillStyle = "rgba(226,158,104," + (fade * 0.7).toFixed(2) + ")";
@@ -543,25 +564,26 @@ window.JC = window.JC || {};
         ctx.fillStyle = "rgba(120,66,40," + (fade * 0.35).toFixed(2) + ")";
         ctx.beginPath();
         ctx.moveTo(mw * 0.66, -mh); ctx.lineTo(mw * 0.80, -mh * 0.62);
-        ctx.lineTo(mw, 40); ctx.lineTo(mw * 0.5, 40);
+        ctx.lineTo(mw, msB); ctx.lineTo(mw * 0.5, msB);
         ctx.closePath(); ctx.fill();
         break;
       }
       case "waterfall": {
         var fh = d.h, fw = d.w;
         var MW = fw * 4.2;                       // mountain half-width
+        var wfB = baseDrop(d, -MW, MW);
 
         // the mountain, with a broken ridge like the other distant peaks
         ctx.fillStyle = "rgba(158,180,196,0.55)";
         ctx.beginPath();
-        ctx.moveTo(-MW, 30);
+        ctx.moveTo(-MW, 30 + wfB);
         ctx.lineTo(-MW * 0.58, -fh * 0.60);
         ctx.lineTo(-MW * 0.30, -fh * 0.88);
         ctx.lineTo(-fw * 0.75, -fh);
         ctx.lineTo(fw * 0.75, -fh * 0.99);
         ctx.lineTo(MW * 0.34, -fh * 0.84);
         ctx.lineTo(MW * 0.62, -fh * 0.55);
-        ctx.lineTo(MW, 30);
+        ctx.lineTo(MW, 30 + wfB);
         ctx.closePath(); ctx.fill();
 
         // snow on the two shoulders
@@ -584,8 +606,8 @@ window.JC = window.JC || {};
         ctx.beginPath();
         ctx.moveTo(-fw * 0.78, -fh * 0.97);
         ctx.lineTo(fw * 0.78, -fh * 0.97);
-        ctx.lineTo(fw * 1.15, 24);
-        ctx.lineTo(-fw * 1.15, 24);
+        ctx.lineTo(fw * 1.15, 24 + wfB);
+        ctx.lineTo(-fw * 1.15, 24 + wfB);
         ctx.closePath(); ctx.fill();
 
         // the fall: narrow at the lip, spreading as it drops
@@ -593,8 +615,8 @@ window.JC = window.JC || {};
         ctx.beginPath();
         ctx.moveTo(-fw * 0.30, -fh * 0.95);
         ctx.lineTo(fw * 0.30, -fh * 0.95);
-        ctx.quadraticCurveTo(fw * 0.52, -fh * 0.4, fw * 0.62, 18);
-        ctx.lineTo(-fw * 0.62, 18);
+        ctx.quadraticCurveTo(fw * 0.52, -fh * 0.4, fw * 0.62, 18 + wfB);
+        ctx.lineTo(-fw * 0.62, 18 + wfB);
         ctx.quadraticCurveTo(-fw * 0.52, -fh * 0.4, -fw * 0.30, -fh * 0.95);
         ctx.closePath(); ctx.fill();
 
@@ -624,7 +646,7 @@ window.JC = window.JC || {};
           var mx = (mi - 1.5) * fw * 0.55;
           var mr = fw * (0.36 + 0.09 * Math.sin(performance.now() / 700 + mi));
           ctx.beginPath();
-          ctx.ellipse(mx, 20, mr, mr * 0.42, 0, 0, 6.283);
+          ctx.ellipse(mx, 20 + wfB, mr, mr * 0.42, 0, 0, 6.283);
           ctx.fill();
         }
         break;
@@ -698,11 +720,18 @@ window.JC = window.JC || {};
         }
         break;
       }
-      case "cablecar":
+      case "cablecar": {
+        /* Each tower stands on its own patch of ground. Both used to start at
+           the centre height, which left the whole frame hanging on a slope. */
+        var tr3 = d._terrain;
+        var lY = tr3 ? tr3.heightAt(d.x - 260) - gy : 0;
+        var rY = tr3 ? tr3.heightAt(d.x + 260) - gy : 0;
+        if (!(lY < 9000)) lY = 0;
+        if (!(rY < 9000)) rY = 0;
         ctx.strokeStyle = "#6E6250"; ctx.lineWidth = 7;
         ctx.beginPath();
-        ctx.moveTo(-260, 0); ctx.lineTo(-260, -320);
-        ctx.moveTo(260, 0); ctx.lineTo(260, -260);
+        ctx.moveTo(-260, lY); ctx.lineTo(-260, -320);
+        ctx.moveTo(260, rY); ctx.lineTo(260, -260);
         ctx.stroke();
         ctx.strokeStyle = INK; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(-260, -320); ctx.lineTo(260, -260); ctx.stroke();
@@ -711,6 +740,7 @@ window.JC = window.JC || {};
         ctx.fillStyle = "#E8A83C";
         rr(ctx, cxp - 16, cyp, 32, 24, 6); ctx.fill(); ctx.stroke();
         break;
+      }
     }
     ctx.restore();
   };
