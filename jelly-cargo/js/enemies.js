@@ -18,7 +18,7 @@ window.JC = window.JC || {};
       blurb: "Rides in fast, rams the tailgate, wheels away."
     },
     drone: {
-      name: "Drone Surfer", hp: 3, r: 18, spd: 120, dmg: 5, cargoDmg: 4, gold: 8,
+      name: "Drone Surfer", hp: 1, r: 18, spd: 120, dmg: 5, cargoDmg: 4, gold: 8,
       threat: 40, weight: 8, air: true, color: "#6FA8E8", shoots: 2.4,
       blurb: "Hovers overhead and plinks at your cargo."
     },

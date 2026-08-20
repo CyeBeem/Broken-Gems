@@ -199,12 +199,12 @@ window.JC = window.JC || {};
     if (!(this.wheels[0].grounded || this.wheels[1].grounded || this.chassis.grounded)) {
       return false;
     }
-    this.hopCool = 1.2;
+    this.hopCool = 2.4;
 
     // straight up in the truck own frame, so it hops off a slope sensibly
     var a = this.chassis.angle();
     var ux = Math.sin(a), uy = -Math.cos(a);
-    var p = 5.95 * (stats && stats.hopPower ? stats.hopPower : 1);
+    var p = 5.15 * (stats && stats.hopPower ? stats.hopPower : 1);
 
     this.chassis.impulse(ux * p, uy * p);
     for (var i = 0; i < this.wheels.length; i++) {
