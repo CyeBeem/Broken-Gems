@@ -5,12 +5,16 @@ window.JC = window.JC || {};
 
   /* One leg of the journey, in world pixels. Bump this if you want longer
      hauls between cargo stops; four card draws are spaced across it. */
-  var LEG_BASE = 68000;
-  var LEG_GROW = 12000;
-  var LEG_CAP = 150000;
+  var LEG_BASE = 34000;
+  var LEG_GROW = 6000;
+  var LEG_CAP = 75000;
 
   var BASE_FIRE = 0.75;          // seconds between shots before modifiers
-  var PULLS_PER_LEG = 8;         // card draws spaced across each leg
+  var PULLS_PER_LEG = 4;         // card draws spaced across each leg
+
+  /* No goblins within this of a stop, so you can roll in, trade and roll out
+     without being jumped. Matches the range the stop becomes visible at. */
+  var SAFE_R = 1400;
 
   function baseStats() {
     return {
@@ -82,6 +86,7 @@ window.JC = window.JC || {};
     this.atStop = false;
     this.over = false;
     this.stopX = 0;
+    this.safeUntilX = -Infinity;
 
     this.stats = baseStats();
 
@@ -416,7 +421,8 @@ window.JC = window.JC || {};
     this.updateCargo(dt);
     this.updateRegen(dt);
 
-    this.director.update(dt, this);
+    if (this.inSafeZone()) { if (this.enemies.length) this.clearSafeZone(); }
+    else this.director.update(dt, this);
     this.abilities.fire("onTick", this, dt);
     this.fx.update(dt);
 
@@ -947,10 +953,32 @@ window.JC = window.JC || {};
     JC.Save.saveRun(this);
   };
 
+  /* True while the truck is close enough to a stop to be left alone. */
+  G.inSafeZone = function () {
+    if (this.atStop) return true;
+    var x = this.truck.pos().x;
+    if (Math.abs(this.stopX - x) < SAFE_R) return true;
+    return x < this.safeUntilX;
+  };
+
+  /* Send anything already chasing you on its way, so a pack cannot follow you
+     into the stop or camp the exit. */
+  G.clearSafeZone = function () {
+    for (var i = this.enemies.length - 1; i >= 0; i--) {
+      var e = this.enemies[i];
+      this.fx.puff(e.x, e.y, e.def.color, 10);
+      this.enemies.splice(i, 1);
+    }
+  };
+
   G.openStop = function () {
     this.atStop = true;
     this.paused = true;
     this.stopScreenX = this.truck.pos().x;
+    // a stop patches you up: truck, cargo and shield all come back
+    this.truckHp = this.stats.truckHp;
+    this.cargoHp = this.stats.cargoHp;
+    this.shield = this.stats.shieldMax;
     this.shop = JC.rollShop(this.rng, this.leg, this.stats.luck);
     this.ui.showStop(this);
   };
@@ -962,6 +990,7 @@ window.JC = window.JC || {};
     this.legStart = this.truck.pos().x - this.startX;
     this.legLen = Math.min(LEG_CAP, LEG_BASE + LEG_GROW * this.leg);
     this.stopX = this.truck.pos().x + this.legLen;
+    this.safeUntilX = this.truck.pos().x + SAFE_R;
     this.pullsThisLeg = 0;
     JC.Save.saveRun(this);
   };

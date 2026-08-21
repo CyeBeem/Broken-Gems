@@ -333,6 +333,7 @@ window.JC = window.JC || {};
 
   JC.Director.prototype.update = function (dt, G) {
     if (G.paused || G.atStop) return;
+    if (G.inSafeZone && G.inSafeZone()) return;
     this.timer -= dt;
     if (this.timer > 0) return;
 
