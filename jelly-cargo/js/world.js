@@ -205,7 +205,7 @@ window.JC = window.JC || {};
     if (!opening && r.chance(0.45)) {
       decor.push({ t: "fence", x: r.range(150, n * STEP - 300), s: 1, len: r.int(4, 9) });
     }
-    if (!opening) addCrates.call(this, specs, n, 0.5);
+    if (!opening) addCrates.call(this, specs, n, 0.5, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -220,7 +220,8 @@ window.JC = window.JC || {};
     for (var d = 0; d < Math.floor(n / 11); d++) {
       decor.push({ t: r.chance(0.7) ? "tree" : "rock", x: r.range(0, n * STEP), s: r.range(0.8, 1.4) });
     }
-    addCrates.call(this, specs, n, 0.6);
+    addCrates.call(this, specs, n, 0.6, null, hs);
+    addPuzzle.call(this, specs, n, 0.26, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -240,7 +241,8 @@ window.JC = window.JC || {};
     // fallen logs you can bump over
     var logs = r.int(1, 3);
     for (var l = 0; l < logs; l++) specs.push({ t: "log", x: r.range(200, n * STEP - 200) });
-    addCrates.call(this, specs, n, 0.7);
+    addCrates.call(this, specs, n, 0.7, null, hs);
+    addPuzzle.call(this, specs, n, 0.26, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -263,7 +265,8 @@ window.JC = window.JC || {};
     decor.push({ t: "peak", x: n * STEP * peak, s: r.range(1.2, 2.0), back: true });
     decor.push({ t: "peak", x: n * STEP * peak - 420, s: r.range(0.8, 1.3), back: true });
     if (r.chance(0.6)) decor.push({ t: "cablecar", x: r.range(300, n * STEP - 300), s: 1, back: true });
-    addCrates.call(this, specs, n, 0.5);
+    addCrates.call(this, specs, n, 0.5, null, hs);
+    addPuzzle.call(this, specs, n, 0.26, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -291,7 +294,9 @@ window.JC = window.JC || {};
       decor.push({ t: "mesa", x: r.range(0, n * STEP), s: r.range(1.5, 2.6),
                    back: true, depth: d });
     }
-    addCrates.call(this, specs, n, 0.6);
+    var clear = [[(gapStart - 7) * STEP, (gapEnd + 7) * STEP]];
+    addCrates.call(this, specs, n, 0.6, clear, hs);
+    addPuzzle.call(this, specs, n, 0.22, clear, hs);
     return { hs: hs, gaps: gaps, decor: decor, specs: specs };
   };
 
@@ -318,7 +323,7 @@ window.JC = window.JC || {};
       decor.push({ t: r.chance(0.5) ? "tree" : "rock", x: r.range(0, n * STEP), s: r.range(0.8, 1.5) });
     }
 
-    addCrates.call(this, specs, n, 0.6);
+    addCrates.call(this, specs, n, 0.6, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -345,7 +350,7 @@ window.JC = window.JC || {};
       carveRamp(hs, n, Math.floor(r.range(200, n * STEP - 600) / STEP),
                 r.int(14, 19), r.range(38, 60), decor);
     }
-    addCrates.call(this, specs, n, 0.9);
+    addCrates.call(this, specs, n, 0.9, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -363,7 +368,8 @@ window.JC = window.JC || {};
                                        s: r.range(1.4, 2.2), back: true, depth: r.int(0, 2) });
     }
     if (r.chance(0.5)) decor.push({ t: "skull", x: r.range(100, n * STEP - 100), s: 1 });
-    addCrates.call(this, specs, n, 0.5);
+    addCrates.call(this, specs, n, 0.5, null, hs);
+    addPuzzle.call(this, specs, n, 0.26, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -387,7 +393,7 @@ window.JC = window.JC || {};
     for (var d = 0; d < Math.floor(n / 6); d++) {
       decor.push({ t: r.chance(0.5) ? "reed" : "deadtree", x: r.range(0, n * STEP), s: r.range(0.8, 1.6) });
     }
-    addCrates.call(this, specs, n, 0.7);
+    addCrates.call(this, specs, n, 0.7, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -409,7 +415,7 @@ window.JC = window.JC || {};
       decor.push({ t: "cone", x: x + 40, s: 1 });
       x += r.range(620, 900);
     }
-    addCrates.call(this, specs, n, 1.0);
+    addCrates.call(this, specs, n, 1.0, null, hs);
     return { hs: hs, decor: decor, specs: specs };
   };
 
@@ -431,11 +437,61 @@ window.JC = window.JC || {};
   }
 
   /* Scatter loose crates you can bump into and knock about. */
-  function addCrates(specs, n, chance) {
+  function inAny(x, zones) {
+    if (!zones) return false;
+    for (var i = 0; i < zones.length; i++) {
+      if (x > zones[i][0] && x < zones[i][1]) return true;
+    }
+    return false;
+  }
+
+  /* avoid is a list of world-x ranges to keep clear -- bridge mouths, mainly.
+     A crate parked on a bridge lip wedges the truck against the chasm with
+     nowhere left to go. */
+  /* Too steep to shove something up, measured straight off the height field. */
+  function steepAt(hs, x) {
+    var i = Math.round(x / STEP);
+    if (!hs || i < 1 || i >= hs.length) return 0;
+    return Math.abs(hs[i] - hs[i - 1]) / STEP;
+  }
+
+  /* Keeps a new obstacle clear of the ones already placed, so a random cluster
+     cannot pile into a wall the truck has no way past. */
+  function roomFor(specs, x, gap) {
+    for (var i = 0; i < specs.length; i++) {
+      if (specs[i].x !== undefined && Math.abs(specs[i].x - x) < gap) return false;
+    }
+    return true;
+  }
+
+  function addCrates(specs, n, chance, avoid, hs) {
     if (!this.rng.chance(chance)) return;
     var count = this.rng.int(1, 4);
     for (var i = 0; i < count; i++) {
-      specs.push({ t: "crate", x: this.rng.range(150, n * STEP - 150) });
+      for (var tries = 0; tries < 18; tries++) {
+        var x = this.rng.range(150, n * STEP - 150);
+        if (inAny(x, avoid)) continue;
+        if (steepAt(hs, x) > 0.3) continue;          // would wall off a climb
+        if (!roomFor(specs, x, 240)) continue;
+        specs.push({ t: "crate", x: x });
+        break;
+      }
+    }
+  }
+
+  /* One physics puzzle in a band, now and then. Every one is built from loose
+     bodies you can shove, climb or smash, so none of them can seal the road
+     off -- that is the whole reason they are bodies and not terrain. */
+  var PUZZLES = ["stack", "dominoes", "pushball"];
+  function addPuzzle(specs, n, chance, avoid, hs) {
+    if (!this.rng.chance(chance)) return;
+    for (var tries = 0; tries < 18; tries++) {
+      var x = this.rng.range(600, n * STEP - 600);
+      if (inAny(x, avoid)) continue;
+      if (steepAt(hs, x) > 0.22) continue;          // wants somewhere workable
+      if (!roomFor(specs, x, 420)) continue;
+      specs.push({ t: this.rng.pick(PUZZLES), x: x, n: this.rng.int(3, 4) });
+      return;
     }
   }
 
@@ -470,12 +526,12 @@ window.JC = window.JC || {};
     var gy = t.heightAt(s.x);
 
     if (s.t === "crate") {
-      var b = JC.makeBox(s.x, gy - 26, 40, 40, { match: 0.5, color: "#C98A4B", kind: "prop", friction: 0.22 });
+      var b = JC.makeJellyBox(s.x, gy - 26, 40, 40, { match: 0.3, color: "#C98A4B", kind: "prop", friction: 0.22 });
       b.userData.group = "prop";
       out.push(w.add(b));
 
     } else if (s.t === "log") {
-      var lg = JC.makeBox(s.x, gy - 22, 120, 34, { match: 0.6, color: "#8A5A32", kind: "prop", friction: 0.24 });
+      var lg = JC.makeJellyBox(s.x, gy - 22, 120, 34, { match: 0.42, color: "#8A5A32", kind: "prop", friction: 0.24 });
       lg.userData.group = "prop";
       out.push(w.add(lg));
 
@@ -487,6 +543,31 @@ window.JC = window.JC || {};
         bl.userData.group = "prop";
         out.push(w.add(bl));
       }
+
+    } else if (s.t === "stack") {
+      // a tower of crates: barge through it, climb it, or hop it
+      for (var st = 0; st < (s.n || 3); st++) {
+        var sb = JC.makeJellyBox(s.x, gy - 25 - st * 40, 36, 36,
+          { match: 0.32, color: "#C98A4B", kind: "prop", friction: 0.5 });
+        sb.userData.group = "prop";
+        out.push(w.add(sb));
+      }
+
+    } else if (s.t === "dominoes") {
+      for (var dm = 0; dm < (s.n || 4); dm++) {
+        var dxp = s.x + dm * 52;
+        var db = JC.makeJellyBox(dxp, t.heightAt(dxp) - 46, 15, 80,
+          { match: 0.55, color: "#B8A05A", kind: "prop", friction: 0.45 });
+        db.userData.group = "prop";
+        out.push(w.add(db));
+      }
+
+    } else if (s.t === "pushball") {
+      // heavy, slow and very much in the way, but it always rolls
+      var pb = JC.makeWheel(s.x, gy - 46, 42, 10,
+        { match: 0.7, pressure: 0.55, color: "#7E8894", kind: "prop", friction: 0.3 });
+      pb.userData.group = "prop";
+      out.push(w.add(pb));
 
     } else if (s.t === "seesaw") {
       var half = (s.w || 220) / 2;
@@ -515,7 +596,7 @@ window.JC = window.JC || {};
     var x1 = s.x, x2 = s.x2, y = s.y;
     var span = x2 - x1;
     var segs = Math.max(7, Math.round(span / 30));
-    var sag = Math.min(46, span * 0.09);
+    var sag = Math.min(22, span * 0.045);   // deep enough to read as rope, shallow enough to drive out of
 
     var deck = JC.makeRope(x1, y, x2, y, segs, { color: "#7A4B28", mass: 2.4 });
     // start it sagging so it settles quickly rather than twanging
@@ -534,10 +615,11 @@ window.JC = window.JC || {};
     for (var k = 0; k < segs; k++) {
       var a = deck.pts[k], b = deck.pts[k + 1];
       var plank = JC.makeBox((a.x + b.x) / 2, (a.y + b.y) / 2 - 5,
-                             span / segs * 1.12, 15,
+                             span / segs * 1.12, 12,
                              { match: 0.95, color: "#9A6438", kind: "plank", friction: 0.85 });
       plank.userData.group = "bridge";
       plank.userData.noSelf = true;
+      plank.userData.noTerrain = true;
       plank.userData.rope = { body: deck, i: k };
       w.add(plank);
       out.push(plank);
@@ -550,6 +632,8 @@ window.JC = window.JC || {};
     rail.userData.group = "bridge";
     rail.userData.noSelf = true;
     rail.userData.decor = true;
+    rail.userData.ghost = true;              // scenery: sags, but never collides
+    rail.userData.noTerrain = true;
     rail.userData.posts = { x1: x1, x2: x2, deck: y, top: railY };
     out.push(w.add(rail));
 
@@ -565,10 +649,14 @@ window.JC = window.JC || {};
         var r = b.userData.rope;
         if (!r) continue;
         var a = r.body.pts[r.i], c = r.body.pts[r.i + 1];
-        lash(b.pts[0], a, 0, -6);
-        lash(b.pts[3], a, 0, 5);
-        lash(b.pts[1], c, 0, -6);
-        lash(b.pts[2], c, 0, 5);
+        /* The deck rope is anchored level with the lip at both ends, so
+           hanging the plank 6px above it put a step in the road exactly where
+           you drive on. Sit the plank just under the rope line instead and let
+           it hang below, and the surface meets the ground flush. */
+        lash(b.pts[0], a, 0, -1);
+        lash(b.pts[3], a, 0, 11);
+        lash(b.pts[1], c, 0, -1);
+        lash(b.pts[2], c, 0, 11);
       }
     }
   };

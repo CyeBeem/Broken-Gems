@@ -334,6 +334,11 @@ window.JC = window.JC || {};
     for (var i = 0; i < this.bodies.length; i++) {
       var b = this.bodies[i];
       if (b.sleeping) continue;
+      /* Planks are held entirely by the rope they are lashed to. They also
+         overlap their neighbours, so the end ones poke into the hillside and
+         the terrain shoved them upward, standing a step up at both ends of
+         every bridge. Let the rope hold them. */
+      if (b.userData.noTerrain) continue;
       b.grounded = false;
       for (var j = 0; j < b.pts.length; j++) {
         var p = b.pts[j];
@@ -365,14 +370,16 @@ window.JC = window.JC || {};
   /* Point-in-polygon then push out along the nearest hull edge — the same
      resolution JellyCar uses, kept cheap with an AABB reject first. */
   World.prototype.collideBodies = function () {
+    // scenery bodies simulate so they can sag and sway, but nothing hits them
+
     var list = this.bodies;
     for (var i = 0; i < list.length; i++) {
       var a = list[i];
-      if (a.sleeping || !a.hull.length) continue;
+      if (a.sleeping || !a.hull.length || a.userData.ghost) continue;
       a.bounds();
       for (var j = i + 1; j < list.length; j++) {
         var b = list[j];
-        if (b.sleeping || !b.hull.length) continue;
+        if (b.sleeping || !b.hull.length || b.userData.ghost) continue;
         b.bounds();
         if (a.max.x < b.min.x || b.max.x < a.min.x ||
             a.max.y < b.min.y || b.max.y < a.min.y) continue;
@@ -471,6 +478,27 @@ window.JC = window.JC || {};
     b.hull = [0, 1, 2, 3];
     b.link(0, 1); b.link(1, 2); b.link(2, 3); b.link(3, 0);
     b.link(0, 2, 0.9); b.link(1, 3, 0.9);
+    b.bake();
+    return b;
+  };
+
+  /* A box with mid-edge points and a core, so the sides can actually bow.
+     Four corners can only ever stay a rigid quad however soft the springs
+     are; the extra points are what let it wobble like the original. */
+  JC.makeJellyBox = function (cx, cy, w, h, opts) {
+    var b = new Body(opts || {});
+    var hw = w / 2, hh = h / 2, i;
+    // perimeter, clockwise from the top left: corner, mid, corner, mid...
+    var ring = [[-hw, -hh], [0, -hh], [hw, -hh], [hw, 0],
+                [hw, hh], [0, hh], [-hw, hh], [-hw, 0]];
+    /* 8 * 0.4 plus the 0.8 core is exactly the 4 * 1 of a plain box, so
+       swapping one in for the other does not change how heavy anything is. */
+    for (i = 0; i < 8; i++) b.add(cx + ring[i][0], cy + ring[i][1], 0.4);
+    b.add(cx, cy, 0.8);                          // core, to hang spokes off
+    b.hull = [0, 1, 2, 3, 4, 5, 6, 7];
+    for (i = 0; i < 8; i++) b.link(i, (i + 1) % 8, 1);      // the shell
+    for (i = 0; i < 8; i++) b.link(i, (i + 4) % 8, 0.45);   // straight across
+    for (i = 0; i < 8; i++) b.link(i, 8, 0.4);              // spokes
     b.bake();
     return b;
   };

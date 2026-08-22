@@ -20,38 +20,130 @@ window.JC = window.JC || {};
 
   var F = JC.FX.prototype;
 
-  F.spawn = function (x, y, vx, vy, life, color, size, grav) {
-    if (this.p.length > 500) return;
-    this.p.push({ x: x, y: y, vx: vx, vy: vy, t: life, max: life,
-                  c: color, s: size, g: grav === undefined ? 1 : grav });
+  /* Every particle carries its own curves rather than just fading out: size
+     ramps from s0 to s1 over its life, colour crossfades from c to c2, and
+     drag bleeds off speed. That shaping is what reads as a particle system
+     rather than a puff of dots.
+
+       kind "dot"    round, the general purpose one
+       kind "chunk"  a spinning square with an ink outline, for debris
+       kind "spark"  a streak stretched along its own velocity, additive
+       kind "smoke"  a big soft blob that swells and thins */
+  F.spawn = function (o) {
+    if (this.p.length > 700) return null;
+    var q = {
+      x: o.x, y: o.y, vx: o.vx || 0, vy: o.vy || 0,
+      t: o.life, max: o.life,
+      c: o.c, c2: o.c2 || o.c,
+      s0: o.s0, s1: o.s1 === undefined ? 0 : o.s1,
+      g: o.g === undefined ? 1 : o.g,
+      drag: o.drag === undefined ? 0.9 : o.drag,
+      kind: o.kind || "dot",
+      rot: o.rot || 0, spin: o.spin || 0,
+      add: !!o.add, ink: !!o.ink
+    };
+    this.p.push(q);
+    return q;
   };
 
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  /* A hot pop of sparks, a few tumbling chunks and a lick of smoke. */
   F.burst = function (x, y, color, n) {
-    for (var i = 0; i < n; i++) {
-      var a = Math.random() * 6.283, sp = 60 + Math.random() * 240;
-      this.spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp,
-                 0.4 + Math.random() * 0.5, color, 3 + Math.random() * 4, 1);
+    var i, a, sp;
+    for (i = 0; i < n; i++) {
+      a = Math.random() * 6.283; sp = rnd(120, 460);
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                   life: rnd(0.22, 0.5), c: "#FFF6D8", c2: color,
+                   s0: rnd(3, 6), s1: 0, g: 0.5, drag: 0.86,
+                   kind: "spark", add: true });
     }
+    for (i = 0; i < Math.max(2, n >> 1); i++) {
+      a = Math.random() * 6.283; sp = rnd(70, 300);
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+                   life: rnd(0.45, 0.95), c: color, c2: JC.shade(color, -0.35),
+                   s0: rnd(4, 8), s1: rnd(2, 4), g: 1.1, drag: 0.97,
+                   kind: "chunk", ink: true, rot: Math.random() * 6.283,
+                   spin: rnd(-11, 11) });
+    }
+    for (i = 0; i < 3; i++) {
+      this.spawn({ x: x + rnd(-10, 10), y: y + rnd(-10, 10),
+                   vx: rnd(-26, 26), vy: rnd(-52, -16),
+                   life: rnd(0.5, 0.9), c: "#FFFFFF", c2: color,
+                   s0: rnd(7, 12), s1: rnd(20, 30), g: -0.12, drag: 0.9,
+                   kind: "smoke" });
+    }
+    this.ring(x, y, 26, color);
   };
 
+  /* Soft and slow — dust, exhaust, things giving up the ghost. */
   F.puff = function (x, y, color, n) {
     for (var i = 0; i < n; i++) {
-      var a = Math.random() * 6.283, sp = 20 + Math.random() * 70;
-      this.spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 40,
-                 0.5 + Math.random() * 0.6, color, 5 + Math.random() * 7, -0.15);
+      var a = Math.random() * 6.283, sp = rnd(15, 80);
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 45,
+                   life: rnd(0.45, 1), c: color, c2: JC.shade(color, 0.4),
+                   s0: rnd(5, 11), s1: rnd(13, 22), g: -0.16, drag: 0.93,
+                   kind: "smoke" });
     }
   };
 
+  /* The little tick of light where a bullet lands. */
   F.hit = function (x, y, n) {
-    for (var i = 0; i < 3; i++) {
-      var a = Math.random() * 6.283;
-      this.spawn(x, y, Math.cos(a) * 120, Math.sin(a) * 120, 0.25, "#FFF2C4", 3, 0.4);
+    for (var i = 0; i < 4; i++) {
+      var a = Math.random() * 6.283, sp = rnd(150, 330);
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                   life: rnd(0.12, 0.26), c: "#FFFFFF", c2: "#FFD24F",
+                   s0: rnd(2.5, 4.5), s1: 0, g: 0.3, drag: 0.84,
+                   kind: "spark", add: true });
     }
   };
 
   F.trail = function (x, y, color) {
-    this.spawn(x, y, (Math.random() - 0.5) * 40, -20 - Math.random() * 40,
-               0.5, color, 4 + Math.random() * 5, -0.2);
+    this.spawn({ x: x, y: y, vx: rnd(-22, 22), vy: rnd(-58, -18),
+                 life: rnd(0.35, 0.65), c: color, c2: JC.shade(color, 0.45),
+                 s0: rnd(4, 8), s1: rnd(9, 15), g: -0.2, drag: 0.92,
+                 kind: "smoke" });
+  };
+
+  /* Rocket exhaust: a white core, orange flame, and smoke rolling off it.
+     dirX/dirY point backwards out of the nozzle. */
+  F.thrust = function (x, y, dirX, dirY, power) {
+    var i, sp, sr;
+    for (i = 0; i < 2; i++) {
+      sp = rnd(240, 620) * (0.6 + power * 0.4);
+      sr = rnd(-0.42, 0.42);
+      var cx = dirX * Math.cos(sr) - dirY * Math.sin(sr);
+      var cy = dirX * Math.sin(sr) + dirY * Math.cos(sr);
+      this.spawn({ x: x, y: y, vx: cx * sp, vy: cy * sp,
+                   life: rnd(0.14, 0.3), c: "#FFFFFF", c2: "#FF9B2C",
+                   s0: rnd(7, 13), s1: 0, g: 0, drag: 0.82,
+                   kind: "spark", add: true });
+    }
+    if (Math.random() < 0.7) {
+      sp = rnd(60, 190);
+      this.spawn({ x: x + rnd(-6, 6), y: y + rnd(-6, 6),
+                   vx: dirX * sp + rnd(-30, 30), vy: dirY * sp + rnd(-30, 30),
+                   life: rnd(0.4, 0.8), c: "#FFD8A0", c2: "#8A8F98",
+                   s0: rnd(6, 11), s1: rnd(18, 28), g: -0.2, drag: 0.9,
+                   kind: "smoke" });
+    }
+    if (Math.random() < 0.5) {
+      this.spawn({ x: x, y: y, vx: dirX * rnd(90, 260), vy: dirY * rnd(90, 260),
+                   life: rnd(0.3, 0.6), c: "#FFC24F", c2: "#E8574F",
+                   s0: rnd(3, 6), s1: rnd(1, 3), g: 0.7, drag: 0.95,
+                   kind: "chunk", ink: true, rot: Math.random() * 6.283,
+                   spin: rnd(-14, 14) });
+    }
+  };
+
+  /* Grit thrown off a spinning wheel. */
+  F.grit = function (x, y, dirX, color) {
+    this.spawn({ x: x, y: y, vx: dirX * rnd(60, 260) , vy: rnd(-190, -40),
+                 life: rnd(0.25, 0.55), c: color || "#C8B48A",
+                 c2: JC.shade(color || "#C8B48A", -0.3),
+                 s0: rnd(2.5, 5), s1: rnd(1, 2.5), g: 1.5, drag: 0.98,
+                 kind: "chunk", ink: false, rot: Math.random() * 6.283,
+                 spin: rnd(-16, 16) });
   };
 
   F.bolt = function (x1, y1, x2, y2) { this.bolts.push({ x1: x1, y1: y1, x2: x2, y2: y2, t: 0.18 }); };
@@ -66,7 +158,11 @@ window.JC = window.JC || {};
       q.t -= dt;
       if (q.t <= 0) { this.p.splice(i, 1); continue; }
       q.vy += 900 * q.g * dt;
+      // damping, frame-rate correct rather than a flat per-step multiply
+      var k = Math.pow(q.drag, dt * 60);
+      q.vx *= k; q.vy *= k;
       q.x += q.vx * dt; q.y += q.vy * dt;
+      q.rot += q.spin * dt;
     }
     for (i = this.bolts.length - 1; i >= 0; i--) if ((this.bolts[i].t -= dt) <= 0) this.bolts.splice(i, 1);
     for (i = this.rings.length - 1; i >= 0; i--) if ((this.rings[i].t -= dt) <= 0) this.rings.splice(i, 1);
@@ -332,11 +428,19 @@ window.JC = window.JC || {};
     return lowest - gy;
   }
 
+  /* Things that sit flat on the ground rather than growing out of it. Drawn
+     axis aligned they leave one edge buried and the other in the air, so they
+     get laid along the slope instead. */
+  var LIES_FLAT = { rock: 1, skull: 1, cone: 1, hoop: 1, fence: 1 };
+
   R.drawProp = function (d, gy) {
     var ctx = this.ctx;
     var s = d.s || 1;
     ctx.save();
     ctx.translate(d.x, gy);
+    if (LIES_FLAT[d.t] && d._terrain) {
+      ctx.rotate(Math.atan(JC.clamp(d._terrain.slopeAt(d.x), -1.1, 1.1)));
+    }
     ctx.lineWidth = 4;
     ctx.strokeStyle = INK;
     ctx.lineJoin = "round";
@@ -443,9 +547,13 @@ window.JC = window.JC || {};
         ctx.closePath(); ctx.fill(); ctx.stroke();
         break;
       case "cactus":
+        /* The arm used to be a lone pill floating clear of the trunk. Draw the
+           elbow first and lay the trunk over the join, so it reads as one
+           plant rather than two segments. */
         ctx.fillStyle = "#4FA85F";
+        rr(ctx, -26 * s, -50 * s, 32 * s, 13 * s, 6 * s); ctx.fill(); ctx.stroke();
+        rr(ctx, -26 * s, -66 * s, 13 * s, 24 * s, 6 * s); ctx.fill(); ctx.stroke();
         rr(ctx, -9 * s, -70 * s, 18 * s, 70 * s, 9 * s); ctx.fill(); ctx.stroke();
-        rr(ctx, -30 * s, -52 * s, 14 * s, 32 * s, 7 * s); ctx.fill(); ctx.stroke();
         break;
       case "reed":
         ctx.strokeStyle = "#7FA84F"; ctx.lineWidth = 4;
@@ -1156,40 +1264,120 @@ window.JC = window.JC || {};
     }
   };
 
+  /* age 0 at birth, 1 at death. */
+  function mixHex(a, b, t) {
+    var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+    var r = Math.round((((x >> 16) & 255)) + ((((y >> 16) & 255)) - (((x >> 16) & 255))) * t);
+    var g = Math.round((((x >> 8) & 255)) + ((((y >> 8) & 255)) - (((x >> 8) & 255))) * t);
+    var bl = Math.round(((x & 255)) + (((y & 255)) - ((x & 255))) * t);
+    return "rgb(" + r + "," + g + "," + bl + ")";
+  }
+
+  function drawParticle(ctx, q) {
+    var age = JC.clamp(1 - q.t / q.max, 0, 1);
+    var size = q.s0 + (q.s1 - q.s0) * age;
+    if (size <= 0.2) return;
+    var col = q.c2 === q.c ? q.c : mixHex(q.c, q.c2, age);
+
+    if (q.kind === "smoke") {
+      // thins out as it swells, so it never sits as a flat disc
+      ctx.globalAlpha = (1 - age) * 0.5;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(q.x, q.y, size, 0, 6.283); ctx.fill();
+      return;
+    }
+
+    if (q.kind === "spark") {
+      // stretched along its own travel: the faster it goes the longer it reads
+      var sp = Math.hypot(q.vx, q.vy);
+      var len = JC.clamp(sp * 0.022, size, size * 5);
+      ctx.globalAlpha = JC.clamp(1 - age * age, 0, 1);
+      ctx.fillStyle = col;
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      if (sp > 1) ctx.rotate(Math.atan2(q.vy, q.vx));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, len, size * 0.5, 0, 0, 6.283);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    if (q.kind === "chunk") {
+      ctx.globalAlpha = JC.clamp(q.t / q.max * 1.6, 0, 1);
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate(q.rot);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.rect(-size, -size, size * 2, size * 2);
+      ctx.fill();
+      if (q.ink && size > 2.4) {
+        ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    ctx.globalAlpha = JC.clamp(q.t / q.max, 0, 1);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(q.x, q.y, size, 0, 6.283); ctx.fill();
+  }
+
   R.drawFX = function (fx) {
     var ctx = this.ctx, i;
+    /* Draw the additive ones last and in one batch, so the composite mode is
+       only swapped twice however many sparks are alive. */
+    var later = null;
     for (i = 0; i < fx.p.length; i++) {
       var q = fx.p[i];
-      ctx.globalAlpha = JC.clamp(q.t / q.max, 0, 1);
-      ctx.fillStyle = q.c;
-      ctx.beginPath();
-      ctx.arc(q.x, q.y, q.s, 0, 6.283);
-      ctx.fill();
+      if (q.add) { (later || (later = [])).push(q); continue; }
+      drawParticle(ctx, q);
+    }
+    if (later) {
+      ctx.globalCompositeOperation = "lighter";
+      for (i = 0; i < later.length; i++) drawParticle(ctx, later[i]);
+      ctx.globalCompositeOperation = "source-over";
     }
     ctx.globalAlpha = 1;
 
     for (i = 0; i < fx.bolts.length; i++) {
       var b = fx.bolts[i];
-      ctx.strokeStyle = "#FFE24F";
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(b.x1, b.y1);
-      var steps = 6;
-      for (var s = 1; s <= steps; s++) {
-        var t = s / steps;
-        ctx.lineTo(JC.lerp(b.x1, b.x2, t) + (Math.random() - 0.5) * 34,
-                   JC.lerp(b.y1, b.y2, t));
+      if (!b.pts) {
+        // freeze the jitter at birth, so the bolt does not reshuffle each frame
+        b.pts = [];
+        for (var bs = 1; bs < 6; bs++) {
+          var bt = bs / 6;
+          b.pts.push({ x: JC.lerp(b.x1, b.x2, bt) + (Math.random() - 0.5) * 34,
+                       y: JC.lerp(b.y1, b.y2, bt) + (Math.random() - 0.5) * 12 });
+        }
       }
-      ctx.stroke();
+      ctx.globalAlpha = JC.clamp(b.t / 0.18, 0, 1);
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (var pass = 0; pass < 2; pass++) {
+        ctx.strokeStyle = pass ? "#FFFFFF" : "#FFD84F";
+        ctx.lineWidth = pass ? 2.5 : 9;
+        ctx.globalAlpha = (pass ? 1 : 0.45) * JC.clamp(b.t / 0.18, 0, 1);
+        ctx.beginPath();
+        ctx.moveTo(b.x1, b.y1);
+        for (var bp = 0; bp < b.pts.length; bp++) ctx.lineTo(b.pts[bp].x, b.pts[bp].y);
+        ctx.lineTo(b.x2, b.y2);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+      ctx.globalAlpha = 1;
     }
 
     for (i = 0; i < fx.rings.length; i++) {
       var g = fx.rings[i];
-      ctx.globalAlpha = g.t / 0.4;
+      var ga = JC.clamp(g.t / 0.4, 0, 1);
+      // snaps outward fast then eases, thinning as it goes
+      var grow = 1 - ga;
+      ctx.globalAlpha = ga * ga * 0.85;
       ctx.strokeStyle = g.c;
-      ctx.lineWidth = 6;
+      ctx.lineWidth = 2 + 7 * ga;
       ctx.beginPath();
-      ctx.arc(g.x, g.y, g.r * (1.4 - g.t / 0.4 * 0.4), 0, 6.283);
+      ctx.arc(g.x, g.y, g.r * (0.35 + 1.15 * Math.sqrt(grow)), 0, 6.283);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -1313,10 +1501,11 @@ window.JC = window.JC || {};
   };
 
   /* The cargo stop itself — a little depot you pull up to. */
-  R.drawStop = function (x, gy) {
+  R.drawStop = function (x, gy, slope) {
     var ctx = this.ctx;
     ctx.save();
     ctx.translate(x, gy);
+    if (slope) ctx.rotate(Math.atan(JC.clamp(slope, -0.7, 0.7)));
     ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineJoin = "round";
     ctx.fillStyle = "#F2E4C4";
     JC.rr(ctx, -110, -150, 220, 150, 10); ctx.fill(); ctx.stroke();

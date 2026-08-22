@@ -204,7 +204,7 @@ window.JC = window.JC || {};
     // straight up in the truck own frame, so it hops off a slope sensibly
     var a = this.chassis.angle();
     var ux = Math.sin(a), uy = -Math.cos(a);
-    var p = 5.15 * (stats && stats.hopPower ? stats.hopPower : 1);
+    var p = 6.22 * (stats && stats.hopPower ? stats.hopPower : 1);
 
     this.chassis.impulse(ux * p, uy * p);
     for (var i = 0; i < this.wheels.length; i++) {
@@ -264,8 +264,8 @@ window.JC = window.JC || {};
   T.loadCrate = function (kind) {
     var bed = this.bedSlot(this.crates.length);
     var spec = JC.CARGO[kind] || JC.CARGO.boxes;
-    var b = JC.makeBox(bed.x, bed.y, 21, 21, {
-      match: 0.55, friction: 0.7, color: spec.color, kind: "cargo"
+    var b = JC.makeJellyBox(bed.x, bed.y, 21, 21, {
+      match: 0.34, friction: 0.7, color: spec.color, kind: "cargo"
     });
     b.userData.group = "cargo";
     b.userData.cargo = kind;

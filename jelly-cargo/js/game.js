@@ -346,7 +346,17 @@ window.JC = window.JC || {};
       var a2 = Math.atan2(b.vy, b.vx);
       b.vx = Math.cos(a2) * b.speed; b.vy = Math.sin(a2) * b.speed;
     }
-    this.fx.spawn(b.x, b.y, -Math.cos(ang) * 90, -Math.sin(ang) * 90, 0.18, "#FFE9A0", 4, 0);
+    for (var mf = 0; mf < 4; mf++) {
+      var ma = ang + (Math.random() - 0.5) * 0.7;
+      var msp = 90 + Math.random() * 210;
+      this.fx.spawn({ x: b.x, y: b.y, vx: Math.cos(ma) * msp, vy: Math.sin(ma) * msp,
+                      life: 0.1 + Math.random() * 0.12, c: "#FFFFFF", c2: "#FFC24F",
+                      s0: 3 + Math.random() * 3, s1: 0, g: 0, drag: 0.8,
+                      kind: "spark", add: true });
+    }
+    this.fx.spawn({ x: b.x, y: b.y, vx: -Math.cos(ang) * 70, vy: -Math.sin(ang) * 70,
+                    life: 0.34, c: "#FFE9A0", c2: "#9AA7B4",
+                    s0: 5, s1: 15, g: -0.25, drag: 0.88, kind: "smoke" });
   };
 
   G.spawnEnemyShot = function (e, tp, shell) {
@@ -450,9 +460,24 @@ window.JC = window.JC || {};
     this.truck.drive(dt, throttle, lean * (1 + s.airControl), s);
 
     if (I.held("f") && this.abilities.has("thrusters") || I.held("f") && this.abilities.has("afterburner")) {
-      this.truck.boost(dt, s);
+      if (this.truck.boost(dt, s)) {
+        // fire out of the back of the truck, in its own frame
+        var ba = this.truck.angle();
+        var rear = this.truck.localToWorld(-96, 6);
+        this.fx.thrust(rear.x, rear.y, -Math.cos(ba), -Math.sin(ba), s.boostPower || 1);
+      }
     } else {
       this.truck.boosting = 0;
+    }
+
+    // grit kicked up by the driven wheels
+    if (throttle && Math.abs(this.truck.vel().x) > 0.4) {
+      for (var wi = 0; wi < this.truck.wheels.length; wi++) {
+        var wh = this.truck.wheels[wi];
+        if (!wh.grounded || Math.random() > 0.35) continue;
+        var wc = wh.centroid();
+        this.fx.grit(wc.x, wc.y + 24, -JC.sign(throttle), "#C8B48A");
+      }
     }
     this.truck.rechargeFuel(dt, s);
     this.truck.tickHop(dt);
@@ -1052,7 +1077,7 @@ window.JC = window.JC || {};
     R.drawWall(this.minX, this.terrain.heightAt(this.minX));
     if (this.atStop || Math.abs(this.truck.pos().x - this.stopX) < 1400) {
       var sx = this.stopX;
-      R.drawStop(sx, this.terrain.heightAt(sx));
+      R.drawStop(sx, this.terrain.heightAt(sx), this.terrain.slopeAt(sx));
     }
     R.drawBodies(this.world, this.truck);
     R.drawPickups(this.pickups);
