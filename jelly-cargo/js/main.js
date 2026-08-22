@@ -4,6 +4,15 @@
 
   var canvas, ui, game, last = 0, running = false;
 
+  /* The physics is a Verlet integrator, and Verlet is only stable at a fixed
+     step: each step carries a per-step displacement, so stepping more often
+     simply moves everything further. Fed the raw frame delta, a 144Hz screen
+     ran the truck well over twice as fast as a 60Hz one. Simulate in fixed
+     1/60 slices and draw once per frame, whatever the refresh rate. */
+  var FIXED = 1 / 60;
+  var MAX_CATCHUP = 5;              // never simulate more than this per frame
+  var acc = 0;
+
   function start(snapshot) {
     if (game) game.destroy();
     document.getElementById("title").classList.add("gone");
@@ -12,6 +21,8 @@
     if (snapshot) JC.Save.restore(game, snapshot);
     window.__G = game;
     ui.clear();
+    acc = 0;
+    last = 0;
     running = true;
   }
 
@@ -45,7 +56,7 @@
 
   function loop(now) {
     requestAnimationFrame(loop);
-    var dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
+    var dt = last ? Math.min((now - last) / 1000, 0.25) : 0;
     last = now;
     if (!game) return;
     // the canvas can be sized before the page is actually visible, so keep
@@ -53,7 +64,19 @@
     if (canvas.clientWidth !== game.renderer.w || canvas.clientHeight !== game.renderer.h) {
       game.renderer.resize();
     }
-    if (running && !game.paused && !game.over) game.update(dt);
+    if (running && !game.paused && !game.over) {
+      acc += dt;
+      var steps = 0;
+      while (acc >= FIXED && steps < MAX_CATCHUP) {
+        game.update(FIXED);
+        acc -= FIXED;
+        steps++;
+      }
+      // too far behind to catch up; drop the backlog rather than spiral
+      if (acc > FIXED * MAX_CATCHUP) acc = 0;
+    } else {
+      acc = 0;
+    }
     game.draw();
     ui.update(game);
   }

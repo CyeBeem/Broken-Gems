@@ -61,6 +61,21 @@ window.JC = window.JC || {};
 
   JC.abilityList = function () { return ORDER; };
 
+  /* Which ability a variant is the upgraded form of, or null for the
+     combo-only ones that do not belong to any single ability. Built lazily,
+     because ORDER is still filling up while this file runs. */
+  var VARIANT_BASE = null;
+  JC.variantBase = function (id) {
+    if (!VARIANT_BASE) {
+      VARIANT_BASE = {};
+      for (var i = 0; i < ORDER.length; i++) {
+        var a = JC.ABILITIES[ORDER[i]];
+        if (a.variant) VARIANT_BASE[a.variant] = a.id;
+      }
+    }
+    return VARIANT_BASE[id] || null;
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   //  FIRE
   // ══════════════════════════════════════════════════════════════════════════
@@ -1133,14 +1148,26 @@ window.JC = window.JC || {};
 
   /* Which variants are currently reachable. */
   AS.unlockedVariants = function () {
-    var out = [], els = this.elements(), i;
+    var out = [], seen = {}, els = this.elements(), i;
+
     for (i = 0; i < this.order.length; i++) {
       var id = this.order[i], a = JC.ABILITIES[id];
-      if (a.variant && this.owned[id] >= 3 && !this.owned[a.variant]) out.push(a.variant);
+      if (!a.variant || this.owned[a.variant] || this.owned[id] < 3) continue;
+      // a combo-gated variant still wants its pairing, not just a level 3 base
+      var vc = JC.ABILITIES[a.variant].combo;
+      if (vc && vc.length && !(els[vc[0]] && els[vc[1]])) continue;
+      if (!seen[a.variant]) { seen[a.variant] = 1; out.push(a.variant); }
     }
+
     for (i = 0; i < JC.COMBOS.length; i++) {
       var c = JC.COMBOS[i];
-      if (els[c.need[0]] && els[c.need[1]] && !this.owned[c.gives]) out.push(c.gives);
+      if (!els[c.need[0]] || !els[c.need[1]] || this.owned[c.gives]) continue;
+      /* Saltwater is both a combo and Superconductor upgraded form, so the
+         pairing alone used to hand you the upgraded version of an ability you
+         did not own. If it belongs to a base, you need that base first. */
+      var base = JC.variantBase(c.gives);
+      if (base && !this.owned[base]) continue;
+      if (!seen[c.gives]) { seen[c.gives] = 1; out.push(c.gives); }
     }
     return out;
   };
