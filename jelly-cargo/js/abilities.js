@@ -87,7 +87,7 @@ window.JC = window.JC || {};
         near(G, p.x, p.y, S(72, L)).forEach(function (e) {
           dmg(G, e, S(9, L) * dt); st(e, "burn", dt * 1.6);
         });
-        if (rand(G) < 0.4) G.fx.puff(p.x, p.y, "#FF7A3C", 2);
+        G.fx.cone(p.x, p.y, G.truck.angle(), S(72, L), "fire");
       } });
   A("cinders", "Cinders", "fire", "Burning goblins drop embers that keep burning.",
     { variant: "ashfall", onKill: function (G, e, L) {
@@ -148,14 +148,24 @@ window.JC = window.JC || {};
         G.count.hailT = G.time;
         var p = G.truck.pos();
         var e = G.nearestEnemy(p.x, p.y, 520);
-        if (e) { dmg(G, e, S(6, L)); st(e, "slow", 0.14); G.fx.puff(e.x, e.y - 20, "#BFEFFF", 8); }
+        if (e) {
+          dmg(G, e, S(6, L)); st(e, "slow", 0.14);
+          G.fx.hail(e.x, e.y);                     // stones actually falling in
+          G.fx.elem(e.x, e.y, "ice", 1.2);
+        }
       } });
-  A("permafrost", "Permafrost", "ice", "Leaves a slowing frost patch behind you.",
+  A("permafrost", "Permafrost", "ice", "Freezes the road behind you, and anything on it.",
     { variant: "glacier", onTick: function (G, dt, L) {
-        if (G.time - (G.count.frostT || 0) < 0.4) return;
+        /* This used to drop the patch at truck-local y 10, which is up around
+           the windscreen -- the frost hung in the air above the cab. The wheels
+           run at local y 62, so the trail belongs down there. */
+        G.wheelSpray = "#CFF3FF";                    // ice chips off the tyres
+        var back = G.truck.wheels[0].centroid();
+        if (G.truck.wheels[0].grounded) G.freezeRoad(back.x, S(60, L), S(1.4, L));
+        if (G.time - (G.count.frostT || 0) < 0.28) return;
         G.count.frostT = G.time;
-        var p = G.truck.localToWorld(-90, 10);
-        G.addHazard(p.x, p.y, S(64, L), 5, "ice", S(1.4, L));
+        G.addHazard(back.x, back.y + 22, S(64, L), 5, "ice", S(1.4, L), { ground: true });
+        G.fx.mist(back.x, back.y + 16, "#CFF3FF");
       } });
   A("flashfreeze", "Flash Freeze", "ice", "Small chance to freeze a goblin outright.",
     { variant: "absolutezero", onHit: function (G, b, e, L) {
@@ -178,6 +188,8 @@ window.JC = window.JC || {};
     { variant: "iceshell", onTick: function (G, dt, L) {
         if (G.shield <= 0 && G.time - (G.count.rimeT || 0) > 9 / S(1, L)) {
           G.count.rimeT = G.time; G.shield = S(12, L);
+          var rp = G.truck.pos();
+          G.fx.shell(rp.x, rp.y, "ice");           // the shell snapping back on
         }
       } });
   A("sleet", "Sleet Rounds", "ice", "Bullets leave a lingering chill where they land.",
@@ -195,9 +207,13 @@ window.JC = window.JC || {};
   A("staticfield", "Static Field", "volt", "A crackling ring shocks anything close.",
     { variant: "tesladome", onTick: function (G, dt, L) {
         var p = G.truck.pos();
-        near(G, p.x, p.y, S(140, L)).forEach(function (e) {
+        var r = S(140, L);
+        near(G, p.x, p.y, r).forEach(function (e) {
           dmg(G, e, S(4, L) * dt); st(e, "shock", dt);
+          // an arc reaching out to whatever it is chewing on
+          if (rand(G) < 0.09) G.fx.bolt(p.x, p.y, e.x, e.y);
         });
+        G.fx.orbit(p.x, p.y, r, "volt");
       } });
   A("capacitor", "Capacitor", "volt", "Every 8th shot is a lightning bolt.",
     { variant: "railgun", onFire: function (G, b, L) {
@@ -1182,14 +1198,43 @@ window.JC = window.JC || {};
     return out;
   };
 
+  /* Where an effect belongs for each hook, given that hook's arguments.
+     onTick is deliberately absent: it runs every frame, so anything that wants
+     a continuous effect draws its own rather than being sprayed automatically. */
+  var ANCHOR = {
+    onHit:   function (G, args) { var e = args[2]; return e ? { x: e.x, y: e.y, p: 1 } : null; },
+    onKill:  function (G, args) { var e = args[1]; return e ? { x: e.x, y: e.y, p: 1.5 } : null; },
+    onFire:  function (G) { var m = G.truck.turretMount(); return { x: m.x, y: m.y, p: 0.7 }; },
+    onRam:   function (G, args) { var e = args[1]; return e ? { x: e.x, y: e.y, p: 1.4 } : null; },
+    onHurt:  function (G) { var p = G.truck.pos(); return { x: p.x, y: p.y, p: 1.2 }; },
+    onDodge: function (G) { var p = G.truck.pos(); return { x: p.x, y: p.y, p: 1.1 }; },
+    onSpill: function (G) { var p = G.truck.localToWorld(-80, 20); return { x: p.x, y: p.y, p: 1 }; }
+  };
+
   AS.fire = function (hook) {
     var args = Array.prototype.slice.call(arguments, 1);
     var handled = false;
+    var G = args[0];
+    var anchor = ANCHOR[hook];
+    /* One flourish per element per event, not one per ability. A ten ability
+       build would otherwise stack ten bursts on a single bullet hit. */
+    var shown = null;
     for (var i = 0; i < this.order.length; i++) {
       var id = this.order[i], a = JC.ABILITIES[id];
       if (!a[hook]) continue;
       var r = a[hook].apply(a, args.concat([this.owned[id]]));
       if (r) handled = true;
+      /* Blanket coverage: 197 of the 211 abilities never drew anything at all.
+         Rather than leave them invisible, every proc now throws its element's
+         colours. Abilities with bespoke effects still draw those on top. */
+      if (anchor && G && G.fx && !a.quietFx) {
+        shown = shown || {};
+        if (!shown[a.el]) {
+          shown[a.el] = 1;
+          var at = anchor(G, args);
+          if (at) G.fx.elem(at.x, at.y, a.el, at.p * (a.fxScale || 1));
+        }
+      }
     }
     return handled;
   };

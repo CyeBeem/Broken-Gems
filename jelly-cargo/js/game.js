@@ -214,7 +214,28 @@ window.JC = window.JC || {};
   G.addHazard = function (x, y, r, life, kind, dps, o) {
     if (this.hazards.length > 90) this.hazards.shift();
     this.hazards.push({ x: x, y: y, r: r, t: life, max: life, kind: kind,
-                        dps: dps || 0, slow: (o && o.slow) || 0 });
+                        dps: dps || 0, slow: (o && o.slow) || 0,
+                        ground: !!(o && o.ground), seed: Math.random() * 1000 });
+  };
+
+  /* A stretch of road turned to ice. Kept as spans rather than blobs so it
+     paints along the actual ground, taking the colour of whatever it froze. */
+  G.freezeRoad = function (x, halfWidth, dur) {
+    var list = this.frost || (this.frost = []);
+    var last = list[list.length - 1];
+    /* Extend the run we are already laying rather than stacking overlaps. The
+       test is whether the new patch starts before the old one ends -- comparing
+       the centre against the end instead meant it never merged and laid a fresh
+       span every single frame. */
+    if (last && x - halfWidth <= last.x1 && x + halfWidth >= last.x0) {
+      last.x1 = Math.max(last.x1, x + halfWidth);
+      last.x0 = Math.min(last.x0, x - halfWidth);
+      last.t = Math.max(last.t, dur * 4);
+      last.max = Math.max(last.max, last.t);
+      return;
+    }
+    if (list.length > 60) list.shift();
+    list.push({ x0: x - halfWidth, x1: x + halfWidth, t: dur * 4, max: dur * 4 });
   };
 
   G.addVortex = function (x, y, r, life, force) {
@@ -434,6 +455,7 @@ window.JC = window.JC || {};
     if (this.inSafeZone()) { if (this.enemies.length) this.clearSafeZone(); }
     else this.director.update(dt, this);
     this.abilities.fire("onTick", this, dt);
+    this.ambientAbilityFx(dt);
     this.fx.update(dt);
 
     this.updateProgress(dt);
@@ -470,15 +492,16 @@ window.JC = window.JC || {};
       this.truck.boosting = 0;
     }
 
-    // grit kicked up by the driven wheels
-    if (throttle && Math.abs(this.truck.vel().x) > 0.4) {
+    // elemental spray off the driven wheels, when an ability calls for it
+    if (this.wheelSpray && throttle && Math.abs(this.truck.vel().x) > 0.4) {
       for (var wi = 0; wi < this.truck.wheels.length; wi++) {
         var wh = this.truck.wheels[wi];
-        if (!wh.grounded || Math.random() > 0.35) continue;
+        if (!wh.grounded || Math.random() > 0.5) continue;
         var wc = wh.centroid();
-        this.fx.grit(wc.x, wc.y + 24, -JC.sign(throttle), "#C8B48A");
+        this.fx.grit(wc.x, wc.y + 24, -JC.sign(throttle), this.wheelSpray);
       }
     }
+    this.wheelSpray = null;
     this.truck.rechargeFuel(dt, s);
     this.truck.tickHop(dt);
     this.truck.updateSquash(dt);
@@ -622,7 +645,32 @@ window.JC = window.JC || {};
     }
   };
 
+  /* Passive abilities and slow tickers never fire a hook you can hang an
+     effect off, so they were invisible. Cycle through everything owned and
+     let one mote at a time drift off the truck in its element colour: a ten
+     ability build reads as a haze of its own colours without burying you. */
+  G.ambientAbilityFx = function (dt) {
+    var owned = this.abilities.order;
+    if (!owned.length || this.atStop || this.paused) return;
+    this.auraT = (this.auraT || 0) + dt;
+    if (this.auraT < 0.09) return;
+    this.auraT = 0;
+    this.auraI = ((this.auraI || 0) + 1) % owned.length;
+    var a = JC.ABILITIES[owned[this.auraI]];
+    if (!a) return;
+    var p = this.truck.pos();
+    this.fx.aura(p.x, p.y - 8, a.el, 48 + Math.random() * 30);
+  };
+
   G.updateHazards = function (dt) {
+    // frozen road thaws out behind you
+    if (this.frost) {
+      for (var fi = this.frost.length - 1; fi >= 0; fi--) {
+        this.frost[fi].t -= dt;
+        if (this.frost[fi].t <= 0) this.frost.splice(fi, 1);
+      }
+    }
+
     for (var i = this.hazards.length - 1; i >= 0; i--) {
       var h = this.hazards[i];
       h.t -= dt;
@@ -1072,6 +1120,7 @@ window.JC = window.JC || {};
 
     R.drawDecor(this.terrain, true);
     R.drawTerrain(this.terrain);
+    R.drawFrost(this.frost, this.terrain);
     R.drawHazards(this.hazards);
     R.drawDecor(this.terrain, false);
     R.drawWall(this.minX, this.terrain.heightAt(this.minX));

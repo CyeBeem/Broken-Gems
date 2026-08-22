@@ -496,9 +496,12 @@ window.JC = window.JC || {};
     for (i = 0; i < 8; i++) b.add(cx + ring[i][0], cy + ring[i][1], 0.4);
     b.add(cx, cy, 0.8);                          // core, to hang spokes off
     b.hull = [0, 1, 2, 3, 4, 5, 6, 7];
-    for (i = 0; i < 8; i++) b.link(i, (i + 1) % 8, 1);      // the shell
-    for (i = 0; i < 8; i++) b.link(i, (i + 4) % 8, 0.45);   // straight across
-    for (i = 0; i < 8; i++) b.link(i, 8, 0.4);              // spokes
+    /* Slack everywhere. The shell holds the outline together, but the struts
+       across the middle and the spokes to the core are deliberately weak, so
+       the whole thing squashes and springs back instead of holding its shape. */
+    for (i = 0; i < 8; i++) b.link(i, (i + 1) % 8, 0.55);   // the shell
+    for (i = 0; i < 8; i++) b.link(i, (i + 4) % 8, 0.12);   // straight across
+    for (i = 0; i < 8; i++) b.link(i, 8, 0.1);              // spokes
     b.bake();
     return b;
   };

@@ -146,6 +146,144 @@ window.JC = window.JC || {};
                  spin: rnd(-16, 16) });
   };
 
+  /* Per element look: a hot core, a body colour, and which shapes suit it.
+     Every ability in the game routes through here, so an ability nobody wrote
+     a bespoke effect for still reads as fire or ice or volt at a glance. */
+  var ELFX = {
+    fire:  { hot: "#FFF3C0", body: "#FF7A3C", cool: "#8A3B22", smoke: 1,   spark: 1.2, chunk: 0.6, shard: 0 },
+    ice:   { hot: "#FFFFFF", body: "#7FD8FF", cool: "#4A7FA8", smoke: 0.7, spark: 0.5, chunk: 0,   shard: 1.3 },
+    volt:  { hot: "#FFFFFF", body: "#FFE24F", cool: "#B07A1E", smoke: 0.2, spark: 1.6, chunk: 0,   shard: 0.4 },
+    acid:  { hot: "#E8FFC0", body: "#8FE84F", cool: "#3F6B22", smoke: 0.9, spark: 0.5, chunk: 0.3, shard: 0 },
+    kin:   { hot: "#FFFFFF", body: "#FFB84F", cool: "#7A5218", smoke: 0.4, spark: 0.9, chunk: 1.2, shard: 0 },
+    guard: { hot: "#E8F4FF", body: "#6FA8E8", cool: "#2F4E70", smoke: 0.3, spark: 0.6, chunk: 0.5, shard: 0.6 },
+    cargo: { hot: "#FFE4B8", body: "#C98A4B", cool: "#6B4522", smoke: 0.7, spark: 0.3, chunk: 1.3, shard: 0 },
+    move:  { hot: "#DFFFF4", body: "#7FE8C0", cool: "#2F7A62", smoke: 0.9, spark: 0.7, chunk: 0,   shard: 0.3 },
+    tech:  { hot: "#F0E4FF", body: "#B08FE8", cool: "#523A78", smoke: 0.4, spark: 0.8, chunk: 0.7, shard: 0.5 },
+    void:  { hot: "#FFD8FF", body: "#D86AE8", cool: "#4A1E52", smoke: 1.1, spark: 0.7, chunk: 0,   shard: 0.6 }
+  };
+  JC.ELFX = ELFX;
+  function elfx(el) { return ELFX[el] || ELFX.kin; }
+
+  /* One elemental flourish. power ~1 is a routine proc, ~2 a big one. */
+  F.elem = function (x, y, el, power) {
+    var E = elfx(el), i, a, sp;
+    var p = power || 1;
+    var n = Math.round(3 * p);
+
+    for (i = 0; i < Math.round(n * E.spark); i++) {
+      a = Math.random() * 6.283; sp = rnd(110, 380) * p;
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                   life: rnd(0.16, 0.4), c: E.hot, c2: E.body,
+                   s0: rnd(2.5, 5) * p, s1: 0, g: 0.35, drag: 0.85,
+                   kind: "spark", add: true });
+    }
+    for (i = 0; i < Math.round(n * E.shard); i++) {
+      a = Math.random() * 6.283; sp = rnd(80, 260) * p;
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30,
+                   life: rnd(0.35, 0.7), c: E.hot, c2: E.body,
+                   s0: rnd(3, 6) * p, s1: rnd(1, 2), g: 0.8, drag: 0.96,
+                   kind: "shard", ink: true, rot: a, spin: rnd(-8, 8) });
+    }
+    for (i = 0; i < Math.round(n * E.chunk); i++) {
+      a = Math.random() * 6.283; sp = rnd(60, 240) * p;
+      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+                   life: rnd(0.4, 0.8), c: E.body, c2: E.cool,
+                   s0: rnd(3, 6) * p, s1: rnd(1.5, 3), g: 1.1, drag: 0.97,
+                   kind: "chunk", ink: true, rot: Math.random() * 6.283,
+                   spin: rnd(-12, 12) });
+    }
+    for (i = 0; i < Math.round(2 * E.smoke * p); i++) {
+      this.spawn({ x: x + rnd(-8, 8), y: y + rnd(-8, 8),
+                   vx: rnd(-30, 30), vy: rnd(-60, -14),
+                   life: rnd(0.4, 0.85), c: E.body, c2: E.cool,
+                   s0: rnd(5, 9) * p, s1: rnd(14, 24) * p, g: -0.14, drag: 0.9,
+                   kind: "smoke" });
+    }
+    if (p >= 1.4) this.ring(x, y, 20 * p, E.body);
+  };
+
+  /* A soft elemental glow that clings to something -- auras, shields, buffs. */
+  F.aura = function (x, y, el, r) {
+    var E = elfx(el);
+    var a = Math.random() * 6.283;
+    this.spawn({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.6,
+                 vx: Math.cos(a) * 18, vy: Math.sin(a) * 18 - 22,
+                 life: rnd(0.35, 0.7), c: E.hot, c2: E.body,
+                 s0: rnd(3, 6), s1: rnd(0.5, 2), g: -0.1, drag: 0.9,
+                 kind: "dot", add: true });
+  };
+
+  /* Cold fog rolling off the tyres. */
+  F.mist = function (x, y, color) {
+    for (var i = 0; i < 3; i++) {
+      this.spawn({ x: x + rnd(-16, 16), y: y + rnd(-6, 6),
+                   vx: rnd(-34, 34), vy: rnd(-26, -4),
+                   life: rnd(0.6, 1.2), c: "#FFFFFF", c2: color || "#CFF3FF",
+                   s0: rnd(6, 11), s1: rnd(20, 34), g: -0.05, drag: 0.88,
+                   kind: "smoke" });
+    }
+  };
+
+  /* A jet of flame thrown along ang, spreading as it goes. */
+  F.cone = function (x, y, ang, len, el) {
+    var E = elfx(el);
+    for (var i = 0; i < 2; i++) {
+      var sp = rnd(0.55, 1) * len * 4;
+      var off = rnd(-0.34, 0.34);
+      var ca = ang + off;
+      this.spawn({ x: x, y: y, vx: Math.cos(ca) * sp, vy: Math.sin(ca) * sp,
+                   life: rnd(0.16, 0.3), c: E.hot, c2: E.body,
+                   s0: rnd(5, 9), s1: rnd(12, 20), g: -0.25, drag: 0.84,
+                   kind: "smoke" });
+    }
+    if (Math.random() < 0.6) {
+      var sa = ang + rnd(-0.22, 0.22);
+      this.spawn({ x: x, y: y, vx: Math.cos(sa) * len * 5, vy: Math.sin(sa) * len * 5,
+                   life: rnd(0.1, 0.2), c: "#FFFFFF", c2: E.body,
+                   s0: rnd(3, 6), s1: 0, g: 0, drag: 0.8,
+                   kind: "spark", add: true });
+    }
+  };
+
+  /* Motes running around a ring -- shows the reach of an aura ability. */
+  F.orbit = function (x, y, r, el) {
+    if (Math.random() > 0.5) return;
+    var E = elfx(el);
+    var a = Math.random() * 6.283;
+    this.spawn({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.55,
+                 vx: -Math.sin(a) * 150, vy: Math.cos(a) * 90,
+                 life: rnd(0.2, 0.4), c: E.hot, c2: E.body,
+                 s0: rnd(2.5, 5), s1: 0, g: 0, drag: 0.95,
+                 kind: "spark", add: true });
+  };
+
+  /* Stones dropping in from above and shattering. */
+  F.hail = function (x, y) {
+    for (var i = 0; i < 5; i++) {
+      this.spawn({ x: x + rnd(-40, 40), y: y - rnd(120, 260),
+                   vx: rnd(-20, 20), vy: rnd(420, 700),
+                   life: rnd(0.28, 0.5), c: "#FFFFFF", c2: "#7FD8FF",
+                   s0: rnd(3, 6), s1: rnd(2, 4), g: 1.4, drag: 1,
+                   kind: "shard", ink: true, rot: rnd(0, 6.283), spin: rnd(-10, 10) });
+    }
+    this.ring(x, y, 26, "#BFEFFF");
+  };
+
+  /* A shell of shards snapping into place around something. */
+  F.shell = function (x, y, el) {
+    var E = elfx(el);
+    for (var i = 0; i < 12; i++) {
+      var a = i / 12 * 6.283;
+      var r = 74;
+      this.spawn({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.8,
+                   vx: -Math.cos(a) * 120, vy: -Math.sin(a) * 120,
+                   life: 0.34, c: E.hot, c2: E.body,
+                   s0: rnd(4, 7), s1: rnd(1, 2), g: 0, drag: 0.9,
+                   kind: "shard", ink: true, rot: a, spin: 0 });
+    }
+    this.ring(x, y, 70, E.body);
+  };
+
   F.bolt = function (x1, y1, x2, y2) { this.bolts.push({ x1: x1, y1: y1, x2: x2, y2: y2, t: 0.18 }); };
   F.ring = function (x, y, r, c) { this.rings.push({ x: x, y: y, r: r, t: 0.4, c: c }); };
   F.orb = function (x, y, c, r) { this.orbs.push({ x: x, y: y, c: c, r: r, t: 0.05 }); };
@@ -1251,17 +1389,124 @@ window.JC = window.JC || {};
     }
   };
 
+  /* A wobbling pool rather than a clean ellipse -- the edge is pushed in and
+     out by a couple of sine terms so it reads as something spreading. */
+  function poolPath(ctx, x, y, r, squash, wob, phase) {
+    ctx.beginPath();
+    for (var i = 0; i <= 22; i++) {
+      var a = i / 22 * 6.283;
+      var rr = r * (1 + Math.sin(a * 3 + phase) * wob + Math.sin(a * 5 - phase * 1.3) * wob * 0.5);
+      var px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr * squash;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
   R.drawHazards = function (list) {
     var ctx = this.ctx;
-    var cols = { fire: "#FF7A3C", ice: "#BFEFFF", acid: "#8FE84F", volt: "#FFE24F", oil: "#3A3542" };
+    var now = performance.now() / 1000;
     for (var i = 0; i < list.length; i++) {
       var h = list[i];
-      var a = JC.clamp(h.t / h.max, 0, 1) * 0.55;
-      ctx.fillStyle = JC.rgba(cols[h.kind] || "#FFFFFF", a);
-      ctx.beginPath();
-      ctx.ellipse(h.x, h.y, h.r, h.r * 0.42, 0, 0, 6.283);
+      var life = JC.clamp(h.t / h.max, 0, 1);
+      var E = (JC.ELFX && JC.ELFX[h.kind]) || null;
+      var body = E ? E.body : (h.kind === "oil" ? "#3A3542" : "#FFFFFF");
+      var hot = E ? E.hot : "#FFFFFF";
+      var ph = (h.seed || 0) + now * (h.kind === "fire" ? 3.2 : 1.1);
+      // spreads as it lands, shrinks back as it dies
+      var grow = JC.clamp(1 - Math.pow(1 - life, 3), 0.35, 1);
+      var r = h.r * grow;
+
+      ctx.globalAlpha = life * 0.5;
+      ctx.fillStyle = body;
+      poolPath(ctx, h.x, h.y, r, 0.4, 0.07, ph);
       ctx.fill();
+
+      // a brighter heart, offset a touch so it does not look concentric
+      ctx.globalAlpha = life * 0.42;
+      ctx.fillStyle = hot;
+      poolPath(ctx, h.x + Math.sin(ph * 0.7) * r * 0.08, h.y, r * 0.52, 0.4, 0.1, ph * 1.4);
+      ctx.fill();
+
+      ctx.globalAlpha = life * 0.75;
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = body;
+      poolPath(ctx, h.x, h.y, r, 0.4, 0.07, ph);
+      ctx.stroke();
+
+      if (h.kind === "fire" || h.kind === "volt") {
+        // licks of light along the top edge
+        ctx.globalAlpha = life * 0.8;
+        ctx.fillStyle = hot;
+        for (var k = 0; k < 3; k++) {
+          var ka = ph * 1.7 + k * 2.1;
+          var kx = h.x + Math.cos(ka) * r * 0.7;
+          var ky = h.y - Math.abs(Math.sin(ka)) * r * 0.42 - 3;
+          var ks = r * (0.09 + 0.05 * Math.abs(Math.sin(ka * 2)));
+          ctx.beginPath(); ctx.arc(kx, ky, ks, 0, 6.283); ctx.fill();
+        }
+      }
+      if (h.kind === "ice") {
+        // a few crystals standing in the patch
+        ctx.globalAlpha = life * 0.9;
+        ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 2;
+        for (var c = 0; c < 3; c++) {
+          var ca = (h.seed || 0) + c * 2.4;
+          var cx = h.x + Math.cos(ca) * r * 0.55;
+          var cy = h.y + Math.sin(ca) * r * 0.22;
+          var cs = r * 0.2;
+          ctx.beginPath();
+          ctx.moveTo(cx - cs, cy); ctx.lineTo(cx + cs, cy);
+          ctx.moveTo(cx, cy - cs); ctx.lineTo(cx, cy + cs * 0.5);
+          ctx.stroke();
+        }
+      }
     }
+    ctx.globalAlpha = 1;
+  };
+
+  /* Frozen road: paints along the real ground line, tinted with whatever the
+     ground already was, so it looks like that surface iced over. */
+  R.drawFrost = function (list, terrain) {
+    if (!list || !list.length) return;
+    var ctx = this.ctx;
+    var vl = this.viewLeft(), vr = this.viewRight();
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      if (f.x1 < vl || f.x0 > vr) continue;
+      var a = JC.clamp(f.t / f.max, 0, 1);
+      var x0 = Math.max(f.x0, vl), x1 = Math.min(f.x1, vr);
+      if (x1 <= x0) continue;
+
+      var step = 8, x;
+      ctx.beginPath();
+      ctx.moveTo(x0, terrain.heightAt(x0));
+      for (x = x0; x <= x1; x += step) ctx.lineTo(x, terrain.heightAt(x));
+      ctx.lineTo(x1, terrain.heightAt(x1));
+      for (x = x1; x >= x0; x -= step) ctx.lineTo(x, terrain.heightAt(x) + 13);
+      ctx.closePath();
+      ctx.fillStyle = JC.rgba("#BFEFFF", 0.5 * a);
+      ctx.fill();
+
+      // a hard white rim on the surface itself
+      ctx.beginPath();
+      ctx.moveTo(x0, terrain.heightAt(x0) + 1);
+      for (x = x0; x <= x1; x += step) ctx.lineTo(x, terrain.heightAt(x) + 1);
+      ctx.strokeStyle = JC.rgba("#FFFFFF", 0.75 * a);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // frost crazing, fixed to world position so it does not crawl
+      ctx.strokeStyle = JC.rgba("#FFFFFF", 0.35 * a);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (x = Math.ceil(x0 / 26) * 26; x <= x1; x += 26) {
+        var gy = terrain.heightAt(x);
+        ctx.moveTo(x - 7, gy + 4); ctx.lineTo(x + 7, gy + 9);
+        ctx.moveTo(x, gy + 3); ctx.lineTo(x + 3, gy + 11);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   };
 
   /* age 0 at birth, 1 at death. */
@@ -1299,6 +1544,24 @@ window.JC = window.JC || {};
       ctx.beginPath();
       ctx.ellipse(0, 0, len, size * 0.5, 0, 0, 6.283);
       ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    if (q.kind === "shard") {
+      ctx.globalAlpha = JC.clamp(q.t / q.max * 1.5, 0, 1);
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate(q.rot);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(size * 1.9, 0);
+      ctx.lineTo(0, size * 0.72);
+      ctx.lineTo(-size * 1.1, 0);
+      ctx.lineTo(0, -size * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      if (q.ink && size > 2.2) { ctx.lineWidth = 1.8; ctx.strokeStyle = INK; ctx.stroke(); }
       ctx.restore();
       return;
     }

@@ -204,7 +204,7 @@ window.JC = window.JC || {};
     // straight up in the truck own frame, so it hops off a slope sensibly
     var a = this.chassis.angle();
     var ux = Math.sin(a), uy = -Math.cos(a);
-    var p = 6.22 * (stats && stats.hopPower ? stats.hopPower : 1);
+    var p = 6.74 * (stats && stats.hopPower ? stats.hopPower : 1);
 
     this.chassis.impulse(ux * p, uy * p);
     for (var i = 0; i < this.wheels.length; i++) {
