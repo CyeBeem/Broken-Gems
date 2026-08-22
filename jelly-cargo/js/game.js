@@ -949,34 +949,72 @@ window.JC = window.JC || {};
     if (x >= this.stopX) this.openStop();
   };
 
-  /* Three cards: one or two plain stat upgrades, the rest abilities. Every
-     other draw the ability slots offer upgrades to what you already own. */
+  /* Some cards do nothing at all until you own the thing they plug into --
+     fuel refunds with no rocket to burn it, shield recharge with no shield. */
+  G.prereqMet = function (need) {
+    if (!need) return true;
+    if (need === "boost") return this.abilities.has("thrusters") ||
+                                 this.abilities.has("afterburner");
+    if (need === "shield") return this.stats.shieldMax > 0;
+    if (need === "drone") return this.stats.drones > 0;
+    return true;
+  };
+
+  G.usableStats = function () {
+    var out = [], i;
+    for (i = 0; i < JC.STATS.length; i++) {
+      if (this.prereqMet(JC.STATS[i].needs)) out.push(JC.STATS[i]);
+    }
+    return out;
+  };
+
+  /* One brand new ability, one card that deepens what you already run, and one
+     stat. The draft used to be one or two stats plus whatever pickAbilityCard
+     felt like, and since half the pulls were upgrade pulls and 55% of the rest
+     preferred variants, only about 15% of cards were an ability you did not
+     already own -- so a run felt like nothing but upgrades to itself. */
   G.offerCards = function () {
     var upgradePull = (this.pullCount % 2) === 0;
-    var statCount = this.rng() < 0.55 ? 1 : 2;
-    var abilityCount = 3 - statCount;
     var cards = [];
-    var i;
+    var picked = {};
 
-    var statPool = JC.STATS.slice();
-    var stats = this.rng.shuffle(statPool).slice(0, statCount);
-    for (i = 0; i < stats.length; i++) {
-      cards.push({ kind: "stat", stat: stats[i],
+    var fresh = this.pickNewAbility(picked);
+    if (fresh) { cards.push(fresh); picked[fresh.id] = true; }
+
+    var deep = this.pickAbilityCard(upgradePull, picked);
+    if (deep) { cards.push(deep); picked[deep.id] = true; }
+
+    var pool = this.usableStats();
+    if (pool.length) {
+      cards.push({ kind: "stat", stat: this.rng.pick(pool),
                    n: 1 + (this.rng() < this.stats.luck * 0.3 ? 1 : 0) });
     }
 
-    var picked = {};
-    for (i = 0; i < abilityCount; i++) {
-      var c = this.pickAbilityCard(upgradePull, picked);
-      if (c) { cards.push(c); picked[c.id] = true; }
-    }
-    // if the ability pool ran dry, top up with stats
-    while (cards.length < 3) {
-      cards.push({ kind: "stat", stat: this.rng.pick(JC.STATS), n: 1 });
+    // whatever is left over, if a pool ran dry
+    var guard = 0;
+    while (cards.length < 3 && guard++ < 8) {
+      var extra = this.pickAbilityCard(upgradePull, picked);
+      if (extra && !picked[extra.id]) { cards.push(extra); picked[extra.id] = true; continue; }
+      if (pool.length) cards.push({ kind: "stat", stat: this.rng.pick(pool), n: 1 });
+      else break;
     }
 
     this.paused = true;
     this.ui.showCards(this.rng.shuffle(cards), this);
+  };
+
+  /* An ability you do not own yet, prerequisites respected. */
+  G.pickNewAbility = function (taken) {
+    var A = this.abilities, pool = [], all = JC.abilityList(), i;
+    for (i = 0; i < all.length; i++) {
+      var a = JC.ABILITIES[all[i]];
+      if (a.isVariant || A.has(a.id) || taken[a.id]) continue;
+      if (!this.prereqMet(a.needs)) continue;
+      pool.push(a.id);
+    }
+    if (!pool.length) return null;
+    var id = this.rng.pick(pool);
+    return { kind: "new", id: id, ab: JC.ABILITIES[id] };
   };
 
   G.pickAbilityCard = function (preferUpgrade, taken) {
@@ -991,7 +1029,10 @@ window.JC = window.JC || {};
     }
 
     // unlocked variants come first — they are the reward for specialising
-    var vars = A.unlockedVariants().filter(function (v) { return !taken[v]; });
+    var self = this;
+    var vars = A.unlockedVariants().filter(function (v) {
+      return !taken[v] && self.prereqMet(JC.ABILITIES[v].needs);
+    });
     if (vars.length && this.rng() < 0.55) {
       var vid = this.rng.pick(vars);
       return { kind: "variant", id: vid, ab: JC.ABILITIES[vid] };
@@ -1003,6 +1044,7 @@ window.JC = window.JC || {};
       var a = JC.ABILITIES[all[i]];
       if (a.isVariant) continue;
       if (A.has(a.id) || taken[a.id]) continue;
+      if (!this.prereqMet(a.needs)) continue;
       pool.push(a.id);
     }
     if (!pool.length) {

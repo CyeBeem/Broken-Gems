@@ -89,9 +89,13 @@ window.JC = window.JC || {};
         });
         G.fx.cone(p.x, p.y, G.truck.angle(), S(72, L), "fire");
       } });
-  A("cinders", "Cinders", "fire", "Burning goblins drop embers that keep burning.",
-    { variant: "ashfall", onKill: function (G, e, L) {
-        if (JC.hasStatus(e, "burn")) G.addHazard(e.x, e.y, S(70, L), 4, "fire", S(6, L));
+  A("cinders", "Cinders", "fire", "Kills drop embers. Burning kills drop far more.",
+    { variant: "ashfall",
+      onHit: function (G, b, e, L) { st(e, "burn", S(0.25, L)); },
+      onKill: function (G, e, L) {
+        var hot = JC.hasStatus(e, "burn");
+        G.addHazard(e.x, e.y, S(hot ? 70 : 34, L), hot ? 4 : 2,
+                    "fire", S(hot ? 6 : 2.5, L), { ground: true });
       } });
   A("overheat", "Overheat", "fire", "Every 6th shot is a scorching blast.",
     { variant: "meltdown", onFire: function (G, b, L) {
@@ -119,8 +123,10 @@ window.JC = window.JC || {};
       } });
   A("kiln", "Kiln Plating", "fire", "Ramming goblins sets them ablaze.",
     { variant: "forgehull", onRam: function (G, e, L) { st(e, "burn", S(2.2, L)); } });
-  A("pyroclast", "Pyroclast", "fire", "Burn stacks above 6 detonate.",
-    { variant: "chainburn", onTick: function (G, dt, L) {
+  A("pyroclast", "Pyroclast", "fire", "Your shots smoulder, and burn stacks above 6 detonate.",
+    { variant: "chainburn",
+      onHit: function (G, b, e, L) { st(e, "burn", S(0.5, L)); },
+      onTick: function (G, dt, L) {
         G.enemies.forEach(function (e) {
           if (e.st.burn > 6) { e.st.burn = 0; boom(G, e.x, e.y, S(96, L), S(12, L), { el: "fire" }); }
         });
@@ -138,8 +144,9 @@ window.JC = window.JC || {};
   // ══════════════════════════════════════════════════════════════════════════
   A("icicle", "Icicle Rounds", "ice", "Hits slow goblins. Stacks with every hit.",
     { variant: "deepfreeze", onHit: function (G, b, e, L) { st(e, "slow", S(0.11, L)); } });
-  A("frostbite", "Frostbite", "ice", "Slowed goblins take extra damage.",
+  A("frostbite", "Frostbite", "ice", "Shots chill, and chilled goblins take extra damage.",
     { variant: "shatterpoint", onHit: function (G, b, e, L) {
+        st(e, "slow", S(0.06, L));
         if (JC.hasStatus(e, "slow")) dmg(G, e, S(3, L) * e.st.slow * 3);
       } });
   A("hailstorm", "Hailstorm", "ice", "Hail falls on anything near the truck.",
@@ -175,8 +182,9 @@ window.JC = window.JC || {};
     { variant: "frostnova", onKill: function (G, e, L) {
         near(G, e.x, e.y, S(120, L)).forEach(function (o) { st(o, "slow", S(0.16, L)); });
       } });
-  A("brittle", "Brittle Shells", "ice", "Frozen goblins shatter for splash damage.",
+  A("brittle", "Brittle Shells", "ice", "Shots leave goblins brittle. Frozen ones shatter.",
     { variant: "shrapnelice", onHit: function (G, b, e, L) {
+        if (rand(G) < S(0.08, L)) st(e, "freeze", 0.5);
         if (e.st.freeze > 0) boom(G, e.x, e.y, S(90, L), S(10, L), { el: "ice" });
       } });
   A("coolant", "Coolant Loop", "ice", "Fire rate rises while enemies are slowed.",
@@ -220,8 +228,9 @@ window.JC = window.JC || {};
         G.count.cap = (G.count.cap || 0) + 1;
         if (G.count.cap % 8 === 0) { b.dmg *= S(3, L); b.pierce += 4; b.el = "volt"; b.speed *= 1.6; }
       } });
-  A("overcharge", "Overcharge", "volt", "Shocked goblins take more from everything.",
+  A("overcharge", "Overcharge", "volt", "Shots build charge, and charged goblins take more.",
     { variant: "conduction", onHit: function (G, b, e, L) {
+        st(e, "shock", S(0.6, L));
         if (JC.hasStatus(e, "shock")) dmg(G, e, S(2.2, L) * e.st.shock);
       } });
   A("groundstrike", "Ground Strike", "volt", "Lightning hits a random goblin on a timer.",
@@ -241,7 +250,8 @@ window.JC = window.JC || {};
         G.fx.ring(p.x, p.y, S(180, L), "#FFE24F");
       } });
   A("dynamo", "Dynamo", "volt", "Driving fast charges your boost fuel.",
-    { variant: "flywheel", onTick: function (G, dt, L) {
+    // fuel is worthless until something can burn it
+    { needs: "boost", variant: "flywheel", onTick: function (G, dt, L) {
         var v = Math.abs(G.truck.vel().x);
         G.truck.fuel = Math.min(1, G.truck.fuel + v * dt * S(0.0016, L));
       } });
@@ -253,8 +263,9 @@ window.JC = window.JC || {};
     { variant: "downpour", onKill: function (G, e, L) {
         G.addHazard(e.x, e.y - 20, S(80, L), 3.5, "volt", S(5, L));
       } });
-  A("supercon", "Superconductor", "volt", "Wet goblins take double shock.",
+  A("supercon", "Superconductor", "volt", "Rounds leave a soaking. Wet goblins take double shock.",
     { variant: "saltwater", onHit: function (G, b, e, L) {
+        st(e, "wet", S(0.3, L));
         if (JC.hasStatus(e, "wet")) { st(e, "shock", S(1.4, L)); dmg(G, e, S(4, L)); }
       } });
 
@@ -263,8 +274,9 @@ window.JC = window.JC || {};
   // ══════════════════════════════════════════════════════════════════════════
   A("acidrounds", "Acid Rounds", "acid", "Hits poison. Poison ignores armour.",
     { variant: "necrotic", onHit: function (G, b, e, L) { st(e, "poison", S(1.2, L)); } });
-  A("corrosion", "Corrosion", "acid", "Poisoned goblins lose armour and move slower.",
+  A("corrosion", "Corrosion", "acid", "Shots eat away at goblins, worse if they are poisoned.",
     { variant: "dissolve", onHit: function (G, b, e, L) {
+        st(e, "poison", S(0.4, L));
         if (JC.hasStatus(e, "poison")) { st(e, "corrode", S(1, L)); st(e, "slow", 0.05); }
       } });
   A("slickspill", "Slick Spill", "acid", "You leak oil. Oil makes fire much worse.",
@@ -281,8 +293,10 @@ window.JC = window.JC || {};
       } });
   A("caustic", "Caustic Coat", "acid", "Ramming coats goblins in acid.",
     { variant: "acidhull", onRam: function (G, e, L) { st(e, "poison", S(2.4, L)); st(e, "corrode", 2); } });
-  A("bileburst", "Bile Burst", "acid", "Poison stacks above 8 pop for heavy damage.",
-    { variant: "gutrot", onTick: function (G, dt, L) {
+  A("bileburst", "Bile Burst", "acid", "Your shots fester, and poison above 8 pops.",
+    { variant: "gutrot",
+      onHit: function (G, b, e, L) { st(e, "poison", S(0.7, L)); },
+      onTick: function (G, dt, L) {
         G.enemies.forEach(function (e) {
           if (e.st.poison > 8) { e.st.poison = 2; dmg(G, e, S(20, L)); G.fx.puff(e.x, e.y, "#8FE84F", 12); }
         });
@@ -292,8 +306,9 @@ window.JC = window.JC || {};
         var p = G.truck.localToWorld(-70, -30);
         near(G, p.x, p.y, S(96, L)).forEach(function (e) { st(e, "poison", dt * S(1.4, L)); });
       } });
-  A("etchant", "Etchant", "acid", "Corroded goblins take extra bullet damage.",
+  A("etchant", "Etchant", "acid", "Rounds etch armour, and etched goblins take extra damage.",
     { variant: "meltarmor", onHit: function (G, b, e, L) {
+        st(e, "corrode", S(0.5, L));
         if (JC.hasStatus(e, "corrode")) dmg(G, e, b.dmg * S(0.22, L));
       } });
   A("spitback", "Spit Back", "acid", "Damage taken splashes acid on the attacker.",
@@ -371,7 +386,7 @@ window.JC = window.JC || {};
         G.fx.ring(G.truck.pos().x, G.truck.pos().y, 200, "#6FA8E8");
       } });
   A("absorb", "Kinetic Absorber", "guard", "Damage taken charges your boost.",
-    { variant: "impactcell", onHurt: function (G, amt, src, L) {
+    { needs: "boost", variant: "impactcell", onHurt: function (G, amt, src, L) {
         G.truck.fuel = Math.min(1, G.truck.fuel + amt * S(0.012, L));
       } });
   A("dodgeplate", "Glancing Plates", "guard", "A chance to shrug off a hit entirely.",
@@ -474,7 +489,7 @@ window.JC = window.JC || {};
     { variant: "hyperclock", active: { key: "r", cd: 20,
         run: function (G, L) { G.buff("fireRate", 1 + S(1.2, L), 5); } } });
   A("shieldcap", "Shield Capacitor", "tech", "Shields recharge much faster.",
-    { variant: "instantshield", mods: function (G, L, s) { s.shieldRegen *= 1 + S(0.5, L); } });
+    { needs: "shield", variant: "instantshield", mods: function (G, L, s) { s.shieldRegen *= 1 + S(0.5, L); } });
   A("saltvolley", "Salvo Launcher", "tech", "Every few seconds, fire a burst of rockets.",
     { variant: "missilepod", onTick: function (G, dt, L) {
         if (G.time - (G.count.salvoT || 0) < 6 / S(1, L)) return;
@@ -487,7 +502,7 @@ window.JC = window.JC || {};
         }
       } });
   A("recycler", "Recycler", "tech", "Kills sometimes refund a little boost fuel.",
-    { variant: "kinetic_recl", onKill: function (G, e, L) {
+    { needs: "boost", variant: "kinetic_recl", onKill: function (G, e, L) {
         G.truck.fuel = Math.min(1, G.truck.fuel + S(0.05, L));
       } });
   A("luckchip", "Luck Chip", "tech", "Better shop rolls and better cards.",
@@ -1036,6 +1051,239 @@ window.JC = window.JC || {};
         }
       } });
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SECOND WAVE — more to find on a long run, two per element
+  // ══════════════════════════════════════════════════════════════════════════
+
+  A("scorchtrail", "Scorch Trail", "fire", "Hard braking lays a line of burning rubber.",
+    { variant: "magmatrail", onTick: function (G, dt, L) {
+        if (G.truck.vel().x > -0.4) return;
+        if (G.time - (G.count.scT || 0) < 0.3) return;
+        G.count.scT = G.time;
+        var w = G.truck.wheels[0].centroid();
+        G.addHazard(w.x, w.y + 20, S(40, L), 3, "fire", S(6, L), { ground: true });
+      } });
+  A("blastfurnace", "Blast Furnace", "fire", "Shots kindle, and burning goblins take extra damage.",
+    { variant: "crucible", onHit: function (G, b, e, L) {
+        st(e, "burn", S(0.35, L));
+        if (JC.hasStatus(e, "burn")) dmg(G, e, S(5, L));
+      } });
+
+  A("coldforge", "Cold Forge", "ice", "Shots bite deep, and frozen goblins shatter.",
+    { variant: "frostshatter", onHit: function (G, b, e, L) {
+        if (rand(G) < S(0.07, L)) st(e, "freeze", 0.6);
+        st(e, "slow", S(0.05, L));
+        if (JC.hasStatus(e, "freeze")) { dmg(G, e, S(14, L)); G.fx.elem(e.x, e.y, "ice", 1.6); }
+      } });
+  A("whiteout", "Whiteout", "ice", "Chilled goblins lose track of you for a moment.",
+    { variant: "blindingsnow", onHit: function (G, b, e, L) {
+        if (rand(G) < S(0.14, L)) e.stun = Math.max(e.stun || 0, S(0.5, L));
+      } });
+
+  A("conduit", "Conduit", "volt", "Shots earth through the target into whatever is next to it.",
+    { variant: "groundloop", onHit: function (G, b, e, L) {
+        st(e, "shock", S(0.5, L));
+        if (JC.hasStatus(e, "shock")) G.chainFrom(e, 2, S(6, L));
+      } });
+  A("galvanic", "Galvanic Cell", "volt", "Every few seconds a charge earths through the nearest goblin.",
+    { variant: "thundercell", onTick: function (G, dt, L) {
+        if (G.time - (G.count.stcT || 0) < 3.4 / S(1, L)) return;
+        var p = G.truck.pos();
+        var e = G.nearestEnemy(p.x, p.y, 460);
+        if (!e) return;
+        G.count.stcT = G.time;
+        dmg(G, e, S(11, L)); st(e, "shock", 1.6);
+        G.fx.bolt(p.x, p.y - 40, e.x, e.y);
+      } });
+
+  A("solvent", "Solvent Rounds", "acid", "Hits strip armour off whatever they land on.",
+    { variant: "aquaregia", onHit: function (G, b, e, L) {
+        st(e, "mark", S(1.4, L));
+        st(e, "corrode", S(1.2, L));
+      } });
+  A("bilespray", "Bile Spray", "acid", "Kills leave a caustic pool. Corroded ones leave a far worse one.",
+    { variant: "acidrain",
+      onHit: function (G, b, e, L) { st(e, "corrode", S(0.3, L)); },
+      onKill: function (G, e, L) {
+        var rot = JC.hasStatus(e, "corrode");
+        G.addHazard(e.x, e.y, S(rot ? 72 : 38, L), rot ? 4.5 : 2.4,
+                    "acid", S(rot ? 7 : 3, L), { ground: true });
+      } });
+
+  A("slugshot", "Slug Shot", "kin", "Slower, heavier rounds that knock goblins off their feet.",
+    { variant: "siegeslug", mods: function (G, L, s) { s.damage *= 1 + S(0.22, L); s.bulletSpeed *= 0.82; },
+      onHit: function (G, b, e, L) { e.knock(JC.sign(b.vx) * S(210, L), -70); } });
+  A("birdshot", "Birdshot", "kin", "An extra pair of rounds either side of the shot.",
+    { variant: "flakcannon", mods: function (G, L, s) { s.multishot += 2; s.damage *= 0.82; } });
+
+  A("crumplezone", "Crumple Zone", "guard", "The first hit of every fight barely scratches you.",
+    { variant: "sacrificialplate", onHurt: function (G, amt, src, L) {
+        if (G.time - (G.count.czT || 0) < 6) return;
+        G.count.czT = G.time;
+        G.healTruck(amt * S(0.6, L));
+      } });
+  A("rollcage", "Roll Cage", "guard", "Landing badly costs far less, and you right yourself faster.",
+    { variant: "gyrocage", mods: function (G, L, s) {
+        s.fallRes += S(0.3, L); s.stability += S(0.35, L);
+      } });
+
+  A("dunnage", "Dunnage", "cargo", "Packing straw: cargo shrugs off the first knock.",
+    { variant: "airride", mods: function (G, L, s) {
+        s.cargoArmor += S(0.16, L); s.cargoGrip += S(0.2, L);
+      } });
+  A("manifest", "Padded Manifest", "cargo", "Every crate aboard nudges your damage up.",
+    { variant: "bonded", mods: function (G, L, s) {
+        s.damage *= 1 + S(0.05, L) * (G.truck ? G.truck.crates.length : 0);
+      } });
+
+  A("runflat", "Run-Flat Tyres", "move", "Grip that does not care what you are driving over.",
+    { variant: "paddletyres", mods: function (G, L, s) {
+        s.grip *= 1 + S(0.22, L); s.torque *= 1 + S(0.08, L);
+      } });
+  A("kickstart", "Kickstart", "move", "Landing a jump shoves you forward.",
+    { variant: "rampjets", onTick: function (G, dt, L) {
+        var air = G.truck.airTime;
+        if (air > 0.35) { G.count.ksAir = air; return; }
+        if (!G.count.ksAir) return;
+        var boostAmt = Math.min(3.4, G.count.ksAir * S(2.2, L));
+        G.count.ksAir = 0;
+        G.truck.chassis.impulse(boostAmt, 0);
+        for (var i = 0; i < G.truck.wheels.length; i++) G.truck.wheels[i].impulse(boostAmt, 0);
+        G.fx.elem(G.truck.pos().x, G.truck.pos().y + 40, "move", 1.2);
+      } });
+
+  A("autoloader", "Autoloader", "tech", "Every third shot costs no cooldown at all.",
+    { variant: "beltfeed", onFire: function (G, b, L) {
+        G.count.alN = (G.count.alN || 0) + 1;
+        if (G.count.alN % 3 === 0) G.truck.turret.cool = 0;
+      } });
+  A("spotter", "Spotter Optics", "tech", "The further the shot, the harder it lands.",
+    { variant: "rangefinder", onHit: function (G, b, e, L) {
+        var p = G.truck.pos();
+        var d = Math.abs(e.x - p.x);
+        if (d > 300) dmg(G, e, S(4, L) * Math.min(3, d / 300));
+      } });
+
+  A("decayrounds", "Decay Rounds", "void", "Damage lingers and keeps eating away.",
+    { variant: "unmaking", onHit: function (G, b, e, L) {
+        st(e, "poison", S(1.6, L));
+      } });
+  A("collapse", "Collapse", "void", "Kills tug everything nearby toward the wreck.",
+    { variant: "voidmaw", onKill: function (G, e, L) {
+        G.addVortex(e.x, e.y, S(150, L), S(0.9, L), S(320, L));
+        G.fx.elem(e.x, e.y, "void", 1.6);
+      } });
+
+  // ── variants for the second wave ─────────────────────────────────────────
+  V("magmatrail", "Magma Trail", "fire", "The trail is wider, hotter, and lasts.",
+    { onTick: function (G, dt, L) {
+        if (G.truck.vel().x > -0.3) return;
+        if (G.time - (G.count.mtT || 0) < 0.22) return;
+        G.count.mtT = G.time;
+        var w = G.truck.wheels[0].centroid();
+        G.addHazard(w.x, w.y + 20, S(66, L), 5, "fire", S(12, L), { ground: true });
+      } });
+  V("crucible", "Crucible", "fire", "Burning goblins take much more, and spread it on death.",
+    { onHit: function (G, b, e, L) { if (JC.hasStatus(e, "burn")) dmg(G, e, S(11, L)); },
+      onKill: function (G, e, L) {
+        if (JC.hasStatus(e, "burn")) boom(G, e.x, e.y, S(90, L), S(14, L), { el: "fire" });
+      } });
+  V("frostshatter", "Frost Shatter", "ice", "Frozen goblins simply come apart.",
+    { onHit: function (G, b, e, L) {
+        if (!JC.hasStatus(e, "freeze")) return;
+        dmg(G, e, S(34, L)); G.fx.elem(e.x, e.y, "ice", 2);
+      } });
+  V("blindingsnow", "Blinding Snow", "ice", "Chilled goblins stop dead far more often.",
+    { onHit: function (G, b, e, L) {
+        if (rand(G) < S(0.3, L)) { e.stun = Math.max(e.stun || 0, S(1, L)); st(e, "slow", 1); }
+      } });
+  V("groundloop", "Ground Loop", "volt", "The chain jumps further and hits harder.",
+    { onHit: function (G, b, e, L) {
+        if (JC.hasStatus(e, "shock")) G.chainFrom(e, 4, S(13, L));
+      } });
+  V("thundercell", "Thunder Cell", "volt", "The charge comes faster and splits.",
+    { onTick: function (G, dt, L) {
+        if (G.time - (G.count.tcT || 0) < 1.8 / S(1, L)) return;
+        var p = G.truck.pos();
+        var e = G.nearestEnemy(p.x, p.y, 520);
+        if (!e) return;
+        G.count.tcT = G.time;
+        dmg(G, e, S(18, L)); st(e, "shock", 2.4);
+        G.chainFrom(e, 2, S(9, L));
+        G.fx.bolt(p.x, p.y - 40, e.x, e.y);
+      } });
+  V("aquaregia", "Aqua Regia", "acid", "Armour comes off in sheets.",
+    { onHit: function (G, b, e, L) {
+        st(e, "mark", S(3.4, L));
+        st(e, "corrode", S(2.4, L));
+      } });
+  V("acidrain", "Acid Rain", "acid", "Every kill leaves a wide, lasting pool.",
+    { onKill: function (G, e, L) {
+        var rot = JC.hasStatus(e, "corrode");
+        G.addHazard(e.x, e.y, S(rot ? 120 : 70, L), rot ? 7 : 4,
+                    "acid", S(rot ? 13 : 7, L), { ground: true });
+      } });
+  V("siegeslug", "Siege Slug", "kin", "Enormous rounds that send goblins flying.",
+    { mods: function (G, L, s) { s.damage *= 1 + S(0.5, L); s.bulletSpeed *= 0.78; s.bulletSize *= 1.5; },
+      onHit: function (G, b, e, L) { e.knock(JC.sign(b.vx) * S(420, L), -150); } });
+  V("flakcannon", "Flak Cannon", "kin", "A wall of rounds, with no damage penalty.",
+    { mods: function (G, L, s) { s.multishot += 4; } });
+  V("sacrificialplate", "Sacrificial Plate", "guard", "The first hit is refunded entirely.",
+    { onHurt: function (G, amt, src, L) {
+        if (G.time - (G.count.spT || 0) < 4) return;
+        G.count.spT = G.time;
+        G.healTruck(amt);
+      } });
+  V("gyrocage", "Gyro Cage", "guard", "You land flat almost no matter how you left the ground.",
+    { mods: function (G, L, s) {
+        s.fallRes += S(0.6, L); s.stability += S(0.8, L); s.airControl += S(0.3, L);
+      } });
+  V("airride", "Air Ride", "cargo", "Suspended cargo barely notices the road.",
+    { mods: function (G, L, s) {
+        s.cargoArmor += S(0.34, L); s.cargoGrip += S(0.5, L); s.spillSave += S(0.16, L);
+      } });
+  V("bonded", "Bonded Load", "cargo", "A full bed is a serious weapon.",
+    { mods: function (G, L, s) {
+        s.damage *= 1 + S(0.11, L) * (G.truck ? G.truck.crates.length : 0);
+      } });
+  V("paddletyres", "Paddle Tyres", "move", "Grips anything, climbs anything.",
+    { mods: function (G, L, s) {
+        s.grip *= 1 + S(0.45, L); s.torque *= 1 + S(0.25, L);
+      } });
+  V("rampjets", "Ramp Jets", "move", "Every landing fires you down the road.",
+    { onTick: function (G, dt, L) {
+        var air = G.truck.airTime;
+        if (air > 0.35) { G.count.rjAir = air; return; }
+        if (!G.count.rjAir) return;
+        var amt = Math.min(6, G.count.rjAir * S(4.4, L));
+        G.count.rjAir = 0;
+        G.truck.chassis.impulse(amt, 0);
+        for (var i = 0; i < G.truck.wheels.length; i++) G.truck.wheels[i].impulse(amt, 0);
+        G.fx.elem(G.truck.pos().x, G.truck.pos().y + 40, "move", 1.8);
+      } });
+  V("beltfeed", "Belt Feed", "tech", "Every other shot is free.",
+    { onFire: function (G, b, L) {
+        G.count.bfN = (G.count.bfN || 0) + 1;
+        if (G.count.bfN % 2 === 0) G.truck.turret.cool = 0;
+      } });
+  V("rangefinder", "Rangefinder", "tech", "Distance matters far more.",
+    { onHit: function (G, b, e, L) {
+        var p = G.truck.pos();
+        var d = Math.abs(e.x - p.x);
+        if (d > 240) dmg(G, e, S(9, L) * Math.min(4, d / 240));
+      } });
+  V("unmaking", "Unmaking", "void", "The rot spreads to whatever is standing close.",
+    { onHit: function (G, b, e, L) {
+        st(e, "poison", S(3, L));
+        near(G, e.x, e.y, S(90, L)).forEach(function (o) { st(o, "poison", S(1.2, L)); });
+      } });
+  V("voidmaw", "Void Maw", "void", "Kills open a hole that drags everything in.",
+    { onKill: function (G, e, L) {
+        G.addVortex(e.x, e.y, S(260, L), S(1.6, L), S(680, L));
+        boom(G, e.x, e.y, S(90, L), S(10, L), { el: "void" });
+        G.fx.elem(e.x, e.y, "void", 2.2);
+      } });
+
   // ── which variants come from element pairings rather than levelling ───────
   JC.COMBOS = [
     { need: ["fire", "ice"],   gives: "steamburst" },
@@ -1126,7 +1374,8 @@ window.JC = window.JC || {};
     { id: "s_crit",   name: "Sharp Eye",       desc: "+6% crit chance",        apply: function (s, n) { s.crit += 0.06 * n; } },
     { id: "s_pierce", name: "Hardened Tips",   desc: "+1 pierce",              apply: function (s, n) { s.pierce += n; } },
     { id: "s_regen",  name: "Spare Parts",     desc: "+0.5 health per second", apply: function (s, n) { s.regen += 0.5 * n; } },
-    { id: "s_fuel",   name: "Fuel Pump",       desc: "Boost recharges 20% faster", apply: function (s, n) { s.fuelRegen *= Math.pow(0.8, n); } },
+    { id: "s_fuel",   name: "Fuel Pump",       desc: "Boost recharges 20% faster", needs: "boost",
+      apply: function (s, n) { s.fuelRegen *= Math.pow(0.8, n); } },
     { id: "s_luck",   name: "Lucky Charm",     desc: "+15% luck",              apply: function (s, n) { s.luck += 0.15 * n; } },
     { id: "s_bspeed", name: "Hotter Powder",   desc: "+20% bullet speed",      apply: function (s, n) { s.bulletSpeed *= 1 + 0.2 * n; } },
     { id: "s_shield", name: "Shield Cells",    desc: "+15 shield",             apply: function (s, n) { s.shieldMax += 15 * n; } },
