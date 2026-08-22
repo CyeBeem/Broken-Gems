@@ -455,6 +455,7 @@ window.JC = window.JC || {};
     if (this.inSafeZone()) { if (this.enemies.length) this.clearSafeZone(); }
     else this.director.update(dt, this);
     this.abilities.fire("onTick", this, dt);
+    this.freeTrappedProps(dt);
     this.ambientAbilityFx(dt);
     this.fx.update(dt);
 
@@ -587,6 +588,46 @@ window.JC = window.JC || {};
         if (b.pierce > 0) { b.pierce--; }
         else { this.bullets.splice(i, 1); break; }
       }
+    }
+  };
+
+  /* A log or crate can end up wedged under the belly and just ride along for
+     the rest of the run. Props are drawn before the truck, so the wheel paints
+     over the top of it and it reads as being stuck through the wheel. Anything
+     that has sat under there for more than a moment gets shoved out the back
+     so the truck rolls off it. */
+  G.freeTrappedProps = function (dt) {
+    var t = this.truck, c = t.chassis.centroid();
+    var list = this.world.bodies;
+    for (var i = 0; i < list.length; i++) {
+      var pb = list[i];
+      if (pb.userData.group !== "prop") continue;
+      if (pb.pts.length && pb.pts[0].inv === 0) continue;      // pinned scenery
+
+      // currently being let through: run the timer down and leave it alone
+      if (pb.userData.phaseT > 0) {
+        pb.userData.phaseT -= dt;
+        if (pb.userData.phaseT <= 0) {
+          pb.userData.ghost = false;
+          pb.userData.wedged = 0;
+        }
+        continue;
+      }
+
+      var pc = pb.centroid();
+      var under = Math.abs(pc.x - c.x) < 95 &&
+                  pc.y > c.y + 30 && pc.y < c.y + 120;
+      if (!under) { pb.userData.wedged = 0; continue; }
+      pb.userData.wedged = (pb.userData.wedged || 0) + dt;
+      if (pb.userData.wedged < 0.9) continue;                  // still climbing it
+
+      /* Wedged under the belly it jacks the truck up off its own wheels, so
+         there is no traction to drive off it with and both just sit there.
+         Let it fall through to the road for a moment -- the ground still
+         catches it, so it lands and the truck rolls away over the top. */
+      pb.userData.ghost = true;
+      pb.userData.phaseT = 0.9;
+      pb.sleeping = false;
     }
   };
 
