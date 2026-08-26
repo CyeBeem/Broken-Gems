@@ -140,6 +140,19 @@ window.JC = window.JC || {};
       if (this.buffs[k].t > 0 && s[k] !== undefined) s[k] *= this.buffs[k].v;
     }
     this.stats = s;
+
+    /* What is physically bolted on, so the truck visibly grows into the
+       build rather than every upgrade being an invisible number. */
+    var rig = {};
+    for (var gi = 0; gi < this.gear.length; gi++) {
+      var gg = this.gear[gi];
+      if (gg.kind === "gear") rig[gg.id] = (rig[gg.id] || 0) + (gg.mul || 1);
+    }
+    if (this.abilities.has("thrusters") || this.abilities.has("afterburner")) rig.rocket = 1;
+    if (s.drones > 0) rig.dronebay = 1;
+    if (s.shieldMax > 0) rig.emitter = (rig.emitter || 0) + 1;
+    if (s.cargoSlots > 6) rig.bed = (rig.bed || 0) + 1;
+    this.rig = rig;
   };
 
   G.buff = function (stat, mul, dur) {
@@ -705,7 +718,7 @@ window.JC = window.JC || {};
     var a = JC.ABILITIES[owned[this.auraI]];
     if (!a) return;
     var p = this.truck.pos();
-    this.fx.aura(p.x, p.y - 8, a.el, 48 + Math.random() * 30);
+    this.fx.aura(p.x, p.y - 8, a.el, 48 + Math.random() * 30, a.id);
   };
 
   G.updateHazards = function (dt) {
@@ -1140,7 +1153,7 @@ window.JC = window.JC || {};
     this.truckHp = this.stats.truckHp;
     this.cargoHp = this.stats.cargoHp;
     this.shield = this.stats.shieldMax;
-    this.shop = JC.rollShop(this.rng, this.leg, this.stats.luck);
+    this.shop = JC.rollShop(this.rng, this.leg, this.stats.luck, this);
     this.ui.showStop(this);
   };
 

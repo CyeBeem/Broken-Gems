@@ -40,7 +40,7 @@ window.JC = window.JC || {};
     { id: "engine", name: "Engine Block", cost: 130, icon: "engine",
       text: function (m) { return "+" + pc(0.18 * m) + " top speed and torque"; },
       apply: function (s, m) { s.maxSpeed *= 1 + 0.18 * m; s.torque *= 1 + 0.18 * m; } },
-    { id: "tank", name: "Auxiliary Tank", cost: 80, icon: "tank",
+    { id: "tank", name: "Auxiliary Tank", cost: 80, icon: "tank", needs: "boost",
       text: function (m) { return "Boost recharges " + pc(0.3 * m) + " faster"; },
       apply: function (s, m) { s.fuelRegen *= 1 - Math.min(0.7, 0.3 * m); } },
     { id: "barrel", name: "Long Barrel", cost: 120, icon: "barrel",
@@ -61,7 +61,7 @@ window.JC = window.JC || {};
     { id: "rad", name: "Field Radiator", cost: 105, icon: "rad",
       text: function (m) { return "+" + (0.7 * m).toFixed(1) + " health per second"; },
       apply: function (s, m) { s.regen += 0.7 * m; } },
-    { id: "nitro", name: "Nitrous Bottle", cost: 115, icon: "nitro",
+    { id: "nitro", name: "Nitrous Bottle", cost: 115, icon: "nitro", needs: "boost",
       text: function (m) { return "+" + pc(0.45 * m) + " boost power"; },
       apply: function (s, m) { s.boostPower *= 1 + 0.45 * m; } },
     { id: "axles", name: "Reinforced Axles", cost: 100, icon: "axle",
@@ -91,8 +91,10 @@ window.JC = window.JC || {};
 
   // ── rolling a shop ────────────────────────────────────────────────────────
   /* leg is how many stops you have already reached; luck comes from stats. */
-  JC.rollShop = function (rng, leg, luck) {
-    var pool = JC.GEAR.slice();
+  JC.rollShop = function (rng, leg, luck, G) {
+    var pool = JC.GEAR.filter(function (g) {
+      return !g.needs || !G || G.prereqMet(g.needs);
+    });
     var picks = rng.sample(pool, 5);
     return picks.map(function (g) {
       var q = rollQuality(rng, leg, luck);

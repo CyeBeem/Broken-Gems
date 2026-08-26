@@ -187,8 +187,10 @@ window.JC = window.JC || {};
         if (rand(G) < S(0.08, L)) st(e, "freeze", 0.5);
         if (e.st.freeze > 0) boom(G, e.x, e.y, S(90, L), S(10, L), { el: "ice" });
       } });
-  A("coolant", "Coolant Loop", "ice", "Fire rate rises while enemies are slowed.",
-    { variant: "cryoengine", mods: function (G, L, s) {
+  A("coolant", "Coolant Loop", "ice", "Your rounds chill, and chilled goblins raise your fire rate.",
+    { variant: "cryoengine",
+      onHit: function (G, b, e, L) { st(e, "slow", S(0.05, L)); },
+      mods: function (G, L, s) {
         var n = G.enemies.filter(function (e) { return JC.hasStatus(e, "slow"); }).length;
         s.fireRate *= 1 + Math.min(0.5, n * S(0.045, L));
       } });
@@ -445,7 +447,7 @@ window.JC = window.JC || {};
   A("topend", "Tuned Engine", "move", "Higher top speed.",
     { variant: "turbo", mods: function (G, L, s) { s.maxSpeed *= 1 + S(0.14, L); } });
   A("fueltank", "Bigger Tank", "move", "Boost refills faster.",
-    { variant: "quickcharge", mods: function (G, L, s) { s.fuelRegen *= 1 - Math.min(0.6, S(0.16, L)); } });
+    { needs: "boost", variant: "quickcharge", mods: function (G, L, s) { s.fuelRegen *= 1 - Math.min(0.6, S(0.16, L)); } });
   A("airbrake", "Air Brake", "move", "Far more control while airborne.",
     { variant: "skyhook", mods: function (G, L, s) { s.airControl += S(0.5, L); } });
   A("hover", "Hover Skirt", "move", "Briefly float instead of falling into a chasm.",
@@ -668,8 +670,9 @@ window.JC = window.JC || {};
                     dmg: S(4, L), el: "ice", size: 4, life: 0.6, minor: true });
         }
       } });
-  V("cryoengine", "Cryo Engine", "ice", "Slowed enemies also feed your damage.",
-    { mods: function (G, L, s) {
+  V("cryoengine", "Cryo Engine", "ice", "A deeper chill, and it feeds your damage too.",
+    { onHit: function (G, b, e, L) { st(e, "slow", S(0.1, L)); },
+      mods: function (G, L, s) {
         var n = G.enemies.filter(function (e) { return JC.hasStatus(e, "slow"); }).length;
         s.fireRate *= 1 + Math.min(0.8, n * S(0.06, L));
         s.damage *= 1 + Math.min(0.5, n * S(0.03, L));
@@ -913,7 +916,7 @@ window.JC = window.JC || {};
   V("turbo", "Turbocharger", "move", "A far higher ceiling, and it accelerates.",
     { mods: function (G, L, s) { s.maxSpeed *= 1 + S(0.4, L); s.torque *= 1.2; } });
   V("quickcharge", "Quick Charge", "move", "Boost is almost always available.",
-    { mods: function (G, L, s) { s.fuelRegen *= 1 - Math.min(0.85, S(0.35, L)); } });
+    { needs: "boost", mods: function (G, L, s) { s.fuelRegen *= 1 - Math.min(0.85, S(0.35, L)); } });
   V("skyhook", "Sky Hook", "move", "Total control in the air, and you fall slower.",
     { mods: function (G, L, s) { s.airControl += S(1.6, L); s.fallRes += 0.3; } });
   V("antigrav", "Antigrav Skirt", "move", "You can simply drive over a chasm.",
@@ -1481,7 +1484,7 @@ window.JC = window.JC || {};
         if (!shown[a.el]) {
           shown[a.el] = 1;
           var at = anchor(G, args);
-          if (at) G.fx.elem(at.x, at.y, a.el, at.p * (a.fxScale || 1));
+          if (at) G.fx.elem(at.x, at.y, a.el, at.p * (a.fxScale || 1), a.id);
         }
       }
     }

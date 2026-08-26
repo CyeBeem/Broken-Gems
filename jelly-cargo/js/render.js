@@ -164,53 +164,112 @@ window.JC = window.JC || {};
   JC.ELFX = ELFX;
   function elfx(el) { return ELFX[el] || ELFX.kin; }
 
-  /* One elemental flourish. power ~1 is a routine proc, ~2 a big one. */
-  F.elem = function (x, y, el, power) {
+  /* A stable per-ability signature. The id is hashed into a handful of dials
+     -- how the burst is thrown, how fast, how much it spins, how the colours
+     shift, whether it rings -- so every ability reads as its own effect while
+     still sitting inside its element's palette. */
+  var SIGS = {};
+  function hash(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    return h;
+  }
+  var THROW = ["ring", "cone", "fountain", "implode", "spiral", "arc"];
+  function sigFor(id, el) {
+    if (SIGS[id]) return SIGS[id];
+    var h = hash(id || "x");
+    function bit(shift, mod) { return Math.floor(h / Math.pow(2, shift)) % mod; }
+    var E = elfx(el);
+    var s = {
+      shape: THROW[bit(0, THROW.length)],
+      speed: 0.65 + bit(4, 8) * 0.13,          // 0.65 .. 1.56
+      size:  0.75 + bit(8, 7) * 0.1,           // 0.75 .. 1.35
+      life:  0.75 + bit(11, 6) * 0.12,         // 0.75 .. 1.35
+      spin:  (bit(14, 5) - 2) * 5,             // -10 .. 10
+      grav:  -0.3 + bit(17, 6) * 0.28,         // -0.3 .. 1.1
+      ring:  bit(20, 3) === 0,
+      tight: 0.25 + bit(22, 5) * 0.3,          // cone/arc spread
+      hot:   E.hot, body: E.body, cool: E.cool,
+      mix:   bit(25, 3)                        // which colour pair it favours
+    };
+    SIGS[id] = s;
+    return s;
+  }
+  JC.abilitySignature = sigFor;
+
+  /* Throw one particle according to the signature's shape. */
+  function aim(s, i, n) {
+    var t = n > 1 ? i / (n - 1) : 0.5;
+    switch (s.shape) {
+      case "cone":     return -1.05 + (t - 0.5) * s.tight * 3;
+      case "fountain": return -1.57 + (Math.random() - 0.5) * s.tight * 2.2;
+      case "spiral":   return t * 6.283 + s.speed * 3;
+      case "arc":      return -2.6 + t * (1.2 + s.tight);
+      case "implode":  return t * 6.283;
+      default:         return Math.random() * 6.283;
+    }
+  }
+
+  /* One flourish. power ~1 is a routine proc, ~2 a big one. id picks the
+     signature; pass none and it falls back to a plain elemental pop. */
+  F.elem = function (x, y, el, power, id) {
     var E = elfx(el), i, a, sp;
     var p = power || 1;
-    var n = Math.round(3 * p);
+    var s = sigFor(id || el, el);
+    var inward = s.shape === "implode";
+    var n = Math.max(2, Math.round(3 * p * (0.7 + s.size * 0.5)));
 
-    for (i = 0; i < Math.round(n * E.spark); i++) {
-      a = Math.random() * 6.283; sp = rnd(110, 380) * p;
-      this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                   life: rnd(0.16, 0.4), c: E.hot, c2: E.body,
-                   s0: rnd(2.5, 5) * p, s1: 0, g: 0.35, drag: 0.85,
+    for (i = 0; i < Math.round(n * (E.spark || 0.4)); i++) {
+      a = aim(s, i, n); sp = rnd(110, 380) * p * s.speed;
+      var ox = inward ? Math.cos(a) * 46 : 0, oy = inward ? Math.sin(a) * 46 : 0;
+      var dir = inward ? -1 : 1;
+      this.spawn({ x: x + ox, y: y + oy,
+                   vx: Math.cos(a) * sp * dir, vy: Math.sin(a) * sp * dir,
+                   life: rnd(0.16, 0.4) * s.life,
+                   c: s.mix === 2 ? s.body : s.hot, c2: s.mix === 1 ? s.cool : s.body,
+                   s0: rnd(2.5, 5) * p * s.size, s1: 0, g: 0.35, drag: 0.85,
                    kind: "spark", add: true });
     }
     for (i = 0; i < Math.round(n * E.shard); i++) {
-      a = Math.random() * 6.283; sp = rnd(80, 260) * p;
+      a = aim(s, i, n); sp = rnd(80, 260) * p * s.speed;
       this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30,
-                   life: rnd(0.35, 0.7), c: E.hot, c2: E.body,
-                   s0: rnd(3, 6) * p, s1: rnd(1, 2), g: 0.8, drag: 0.96,
-                   kind: "shard", ink: true, rot: a, spin: rnd(-8, 8) });
+                   life: rnd(0.35, 0.7) * s.life, c: s.hot, c2: s.body,
+                   s0: rnd(3, 6) * p * s.size, s1: rnd(1, 2), g: 0.8 + s.grav * 0.3,
+                   drag: 0.96, kind: "shard", ink: true, rot: a,
+                   spin: s.spin || rnd(-8, 8) });
     }
     for (i = 0; i < Math.round(n * E.chunk); i++) {
-      a = Math.random() * 6.283; sp = rnd(60, 240) * p;
+      a = aim(s, i, n); sp = rnd(60, 240) * p * s.speed;
       this.spawn({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
-                   life: rnd(0.4, 0.8), c: E.body, c2: E.cool,
-                   s0: rnd(3, 6) * p, s1: rnd(1.5, 3), g: 1.1, drag: 0.97,
-                   kind: "chunk", ink: true, rot: Math.random() * 6.283,
-                   spin: rnd(-12, 12) });
+                   life: rnd(0.4, 0.8) * s.life, c: s.body, c2: s.cool,
+                   s0: rnd(3, 6) * p * s.size, s1: rnd(1.5, 3), g: 1.1,
+                   drag: 0.97, kind: "chunk", ink: true,
+                   rot: Math.random() * 6.283, spin: s.spin * 1.4 || rnd(-12, 12) });
     }
     for (i = 0; i < Math.round(2 * E.smoke * p); i++) {
       this.spawn({ x: x + rnd(-8, 8), y: y + rnd(-8, 8),
-                   vx: rnd(-30, 30), vy: rnd(-60, -14),
-                   life: rnd(0.4, 0.85), c: E.body, c2: E.cool,
-                   s0: rnd(5, 9) * p, s1: rnd(14, 24) * p, g: -0.14, drag: 0.9,
-                   kind: "smoke" });
+                   vx: rnd(-30, 30) * s.speed, vy: rnd(-60, -14) * s.speed,
+                   life: rnd(0.4, 0.85) * s.life, c: s.body, c2: s.cool,
+                   s0: rnd(5, 9) * p * s.size, s1: rnd(14, 24) * p * s.size,
+                   g: -0.14 + s.grav * 0.1, drag: 0.9, kind: "smoke" });
     }
-    if (p >= 1.4) this.ring(x, y, 20 * p, E.body);
+    if (s.ring || p >= 1.4) this.ring(x, y, 20 * p * s.size, s.body);
   };
 
   /* A soft elemental glow that clings to something -- auras, shields, buffs. */
-  F.aura = function (x, y, el, r) {
-    var E = elfx(el);
+  F.aura = function (x, y, el, r, id) {
+    var s = sigFor(id || el, el);
     var a = Math.random() * 6.283;
     this.spawn({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.6,
-                 vx: Math.cos(a) * 18, vy: Math.sin(a) * 18 - 22,
-                 life: rnd(0.35, 0.7), c: E.hot, c2: E.body,
-                 s0: rnd(3, 6), s1: rnd(0.5, 2), g: -0.1, drag: 0.9,
-                 kind: "dot", add: true });
+                 vx: Math.cos(a) * 18 * s.speed, vy: Math.sin(a) * 18 - 22 * s.speed,
+                 life: rnd(0.35, 0.7) * s.life,
+                 c: s.mix === 2 ? s.body : s.hot, c2: s.mix === 1 ? s.cool : s.body,
+                 s0: rnd(3, 6) * s.size, s1: rnd(0.5, 2), g: -0.1, drag: 0.9,
+                 kind: s.spin > 5 ? "shard" : "dot", add: s.spin <= 5,
+                 ink: s.spin > 5, rot: a, spin: s.spin });
   };
 
   /* Cold fog rolling off the tyres. */
@@ -1098,6 +1157,20 @@ window.JC = window.JC || {};
         ctx.lineTo(Math.cos(ang) * 22, Math.sin(ang) * 22);
         ctx.stroke();
       }
+      // off-road tyres get visible lugs around the outside
+      var rigW = (G && G.rig) || {};
+      if (rigW.wheels) {
+        ctx.strokeStyle = "#1E1C26"; ctx.lineWidth = 7; ctx.lineCap = "round";
+        var lugs = 8;
+        for (var lg = 0; lg < lugs; lg++) {
+          var la = (lg / lugs) * 6.283 + 0.2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(la) * 25, Math.sin(la) * 25);
+          ctx.lineTo(Math.cos(la) * 32, Math.sin(la) * 32);
+          ctx.stroke();
+        }
+        ctx.lineCap = "butt";
+      }
       ctx.restore();
     }
 
@@ -1198,6 +1271,8 @@ window.JC = window.JC || {};
     ctx.stroke();
     ctx.restore();
 
+    this.drawRig(truck, G, P);
+
     // turret — squashed by hand so it rides the deformed roof
     function squashPt(p) {
       var dx = p.x - cc.x, dy = p.y - cc.y;
@@ -1215,18 +1290,165 @@ window.JC = window.JC || {};
     ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.stroke();
     ctx.rotate(truck.turret.ang);
     var rec = truck.turret.recoil;
+    var rig = (G && G.rig) || {};
+    var barLen = 34 + Math.min(26, (rig.barrel || 0) * 13);
+    var barTh = 12 + Math.min(6, (rig.barrel || 0) * 3);
     ctx.fillStyle = "#6E6A7A";
-    rr(ctx, 4 - rec * 8, -6, 34, 12, 5);
+    rr(ctx, 4 - rec * 8, -barTh / 2, barLen, barTh, 5);
     ctx.fill(); ctx.stroke();
+    if (rig.barrel) {                       // a muzzle brake on the long one
+      ctx.fillStyle = "#8A8594";
+      rr(ctx, 4 - rec * 8 + barLen - 9, -barTh / 2 - 2, 9, barTh + 4, 3);
+      ctx.fill(); ctx.stroke();
+    }
     ctx.restore();
 
-    // boost flames
-    if (truck.boosting) {
-      var e = truck.localToWorld(-92, 2);
-      for (var f = 0; f < 3; f++) {
-        G.fx.spawn(e.x, e.y + (f - 1) * 7, -260 - Math.random() * 200, (Math.random() - 0.5) * 90,
-                   0.28, f % 2 ? "#FFD24F" : "#FF7A3C", 8, -0.2);
+  };
+
+  /* Bolt-ons. Everything is placed in the truck's own frame and drawn inside
+     the squash transform, so it deforms along with the body. */
+  R.drawRig = function (truck, G, P) {
+    var rig = (G && G.rig) || {};
+    var ctx = this.ctx;
+    function L(x, y) { return truck.localToWorld(x, y); }
+    function line(a, b, w, col) {
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.lineWidth = w; ctx.strokeStyle = col; ctx.lineCap = "round"; ctx.stroke();
+      ctx.lineCap = "butt";
+    }
+    function plate(x, y, w, h, col) {
+      var a = L(x, y), b = L(x + w, y), c = L(x + w, y + h), d = L(x, y + h);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
+      ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    }
+    function disc(x, y, r, col) {
+      var p = L(x, y);
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.283);
+      ctx.fillStyle = col; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    }
+
+    // armour plating down the flank, one strake per grade
+    if (rig.armor) {
+      var strakes = Math.min(3, Math.ceil(rig.armor));
+      for (var i = 0; i < strakes; i++) {
+        plate(-84 + i * 58, 4 + i * 2, 52, 15, "#8A93A5");
+        var rv = L(-84 + i * 58 + 8, 11), rv2 = L(-84 + i * 58 + 44, 11);
+        ctx.fillStyle = "#5A6274";
+        ctx.beginPath(); ctx.arc(rv.x, rv.y, 2.4, 0, 6.283); ctx.fill();
+        ctx.beginPath(); ctx.arc(rv2.x, rv2.y, 2.4, 0, 6.283); ctx.fill();
       }
+    }
+
+    // ram bar across the nose
+    if (rig.ram) {
+      plate(92, -22, 11, 46, "#6E6A7A");
+      line(L(84, -18), L(99, -18), 6, "#6E6A7A");
+      line(L(84, 18), L(99, 18), 6, "#6E6A7A");
+    }
+
+    // spikes off the bumper
+    if (rig.spikes) {
+      var n = 3 + Math.min(3, Math.round(rig.spikes));
+      for (var s2 = 0; s2 < n; s2++) {
+        var yy = -16 + s2 * (34 / (n - 1));
+        var tip = L(112, yy), b1 = L(92, yy - 5), b2 = L(92, yy + 5);
+        ctx.beginPath();
+        ctx.moveTo(b1.x, b1.y); ctx.lineTo(tip.x, tip.y); ctx.lineTo(b2.x, b2.y);
+        ctx.closePath();
+        ctx.fillStyle = "#C9CEDA"; ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+      }
+    }
+
+    // taller bed rails when the bed is extended
+    if (rig.bed) {
+      plate(-92, -30, 8, 34, "#B85A4A");
+      plate(-4, -30, 8, 34, "#B85A4A");
+      line(L(-90, -28), L(0, -28), 5, "#B85A4A");
+    }
+
+    // a net lashed over the load
+    if (rig.net) {
+      ctx.lineWidth = 2.5; ctx.strokeStyle = "rgba(30,28,38,0.55)";
+      for (var nx = -84; nx <= -8; nx += 19) line(L(nx, -26), L(nx + 10, 6), 2.5, "rgba(30,28,38,0.55)");
+      for (var nx2 = -84; nx2 <= -8; nx2 += 19) line(L(nx2 + 10, -26), L(nx2, 6), 2.5, "rgba(30,28,38,0.55)");
+    }
+
+    // fuel cylinder and nitrous bottle along the sill
+    if (rig.tank) {
+      plate(-70, 26, 44, 14, "#7E8894");
+      disc(-70, 33, 7, "#96A0AC");
+      disc(-26, 33, 7, "#96A0AC");
+    }
+    if (rig.nitro) {
+      plate(-16, 24, 30, 12, "#D8453C");
+      disc(-16, 30, 6, "#E8574F");
+      line(L(14, 30), L(24, 24), 4, "#8A8594");
+    }
+
+    // exhaust stacks behind the cab
+    if (rig.engine) {
+      plate(12, -46, 9, 30, "#5A5566");
+      plate(26, -40, 9, 24, "#5A5566");
+      disc(16, -48, 5, "#3A3542");
+      disc(30, -42, 5, "#3A3542");
+    }
+
+    // radiator fins at the nose
+    if (rig.rad) {
+      plate(74, -10, 16, 26, "#8FC9F0");
+      for (var f2 = 0; f2 < 3; f2++) line(L(76, -6 + f2 * 8), L(88, -6 + f2 * 8), 2.5, "#4F8FC0");
+    }
+
+    // shield emitter dish on the roof
+    if (rig.emitter) {
+      plate(46, -58, 10, 14, "#5A5566");
+      disc(51, -64, 9, "#6FA8E8");
+      disc(51, -64, 4, "#BFE9FF");
+    }
+
+    // scanner dish
+    if (rig.scanner) {
+      var sp = L(64, -56);
+      ctx.save(); ctx.translate(sp.x, sp.y);
+      ctx.beginPath(); ctx.arc(0, 0, 9, Math.PI * 0.15, Math.PI * 1.05);
+      ctx.fillStyle = "#B08FE8"; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.restore();
+      line(L(64, -48), L(64, -40), 3, "#5A5566");
+    }
+
+    // winch drum
+    if (rig.winch) {
+      plate(84, 8, 16, 14, "#6E6A7A");
+      disc(92, 15, 5, "#C9CEDA");
+    }
+
+    // magnet coil on the bed side
+    if (rig.magnet) {
+      plate(-52, -14, 18, 16, "#4F5A70");
+      line(L(-50, -12), L(-36, -12), 2.5, "#E8C34F");
+      line(L(-50, -7), L(-36, -7), 2.5, "#E8C34F");
+      line(L(-50, -2), L(-36, -2), 2.5, "#E8C34F");
+    }
+
+    // suspension springs over the axles
+    if (rig.susp) {
+      [-54, 54].forEach(function (ax) {
+        for (var k = 0; k < 4; k++) {
+          line(L(ax - 9, 12 + k * 4), L(ax + 9, 14 + k * 4), 3, "#C9CEDA");
+        }
+      });
+    }
+
+    // rocket nozzle out the back
+    if (rig.rocket) {
+      plate(-104, -8, 14, 20, "#5A5566");
+      disc(-106, 2, 7, "#3A3542");
     }
   };
 
