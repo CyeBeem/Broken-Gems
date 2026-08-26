@@ -132,9 +132,11 @@ window.JC = window.JC || {};
   };
 
   /* Cargo is worth more the further you have hauled it. */
+  var SELL_RATE = 1.5;
+
   JC.sellPrice = function (kind, leg, sellMul) {
     var c = JC.CARGO[kind] || JC.CARGO.boxes;
-    return Math.round(c.value * (1 + leg * 0.22) * (sellMul || 1));
+    return Math.round(c.value * SELL_RATE * (1 + leg * 0.22) * (sellMul || 1));
   };
 
 })(window.JC);

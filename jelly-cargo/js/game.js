@@ -18,7 +18,7 @@ window.JC = window.JC || {};
 
   function baseStats() {
     return {
-      damage: 1, fireRate: 1, bulletSpeed: 1, bulletSize: 1, bulletLife: 1.4,
+      damage: 2, fireRate: 1, bulletSpeed: 1, bulletSize: 1, bulletLife: 1.4,
       pierce: 0, multishot: 0, crit: 0.03, critMul: 2, homing: 0, splash: 0,
       phase: false, bulletEat: 0,
 
@@ -257,8 +257,13 @@ window.JC = window.JC || {};
   G.shake = function (n) { this.renderer.cam.shake = Math.min(26, this.renderer.cam.shake + n); };
 
   // ── damage ────────────────────────────────────────────────────────────────
+  /* Everything that reaches the truck is halved before armour and shields
+     get their say, so armour keeps its full value on top. */
+  var DMG_TAKEN = 0.5;
+
   G.hurtTruck = function (amount, src) {
     if (this.over) return;
+    amount *= DMG_TAKEN;
     if (this.rng() < this.stats.dodge) {
       this.fx.text(this.truck.pos().x, this.truck.pos().y - 70, "DODGE", "#7FE8C0");
       this.abilities.fire("onDodge", this);
